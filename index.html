@@ -1,0 +1,2815 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ODIN Catalog — Documentation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" />
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #060912;
+      --surface: #0d1321;
+      --surface2: #111827;
+      --surface3: #1a2235;
+      --border: rgba(255, 255, 255, 0.07);
+      --border2: rgba(255, 255, 255, 0.12);
+      --indigo: #6366f1;
+      --indigo-lt: #818cf8;
+      --cyan: #22d3ee;
+      --emerald: #10b981;
+      --amber: #f59e0b;
+      --rose: #f43f5e;
+      --violet: #a78bfa;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --subtle: #475569;
+      --sidebar-w: 272px;
+      --topbar-h: 56px;
+    }
+
+    html {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 15px;
+    }
+
+    body {
+      min-height: 100vh;
+    }
+
+    a {
+      color: var(--indigo-lt);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    /* ── Top bar ──────────────────────────────────────────── */
+    .topbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 200;
+      height: var(--topbar-h);
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 0 20px;
+    }
+
+    .topbar-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--text);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .topbar-logo img {
+      height: 28px;
+      width: 28px;
+      border-radius: 6px;
+      object-fit: contain;
+    }
+
+    .version-pill {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--amber);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      background: rgba(245, 158, 11, 0.08);
+      padding: 2px 8px;
+      border-radius: 99px;
+    }
+
+    .topbar-search {
+      flex: 1;
+      max-width: 400px;
+      margin-left: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      padding: 0 12px;
+      height: 34px;
+    }
+
+    .topbar-search input {
+      background: none;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      width: 100%;
+    }
+
+    .topbar-search input::placeholder {
+      color: var(--subtle);
+    }
+
+    .topbar-search svg {
+      flex-shrink: 0;
+      color: var(--subtle);
+    }
+
+    .topbar-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .topbar-right a {
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 500;
+      text-decoration: none;
+    }
+
+    .topbar-right a:hover {
+      color: var(--text);
+    }
+
+    .hamburger {
+      display: none;
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    /* ── Layout ───────────────────────────────────────────── */
+    .layout {
+      display: flex;
+      padding-top: var(--topbar-h);
+      min-height: 100vh;
+    }
+
+    /* ── Sidebar ──────────────────────────────────────────── */
+    .sidebar {
+      position: fixed;
+      top: var(--topbar-h);
+      left: 0;
+      bottom: 0;
+      width: var(--sidebar-w);
+      overflow-y: auto;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 20px 0 40px;
+      z-index: 100;
+    }
+
+    .sidebar::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .sidebar::-webkit-scrollbar-thumb {
+      background: var(--border2);
+      border-radius: 4px;
+    }
+
+    .nav-section {
+      margin-bottom: 4px;
+    }
+
+    .nav-group-label {
+      display: block;
+      padding: 8px 20px 4px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--subtle);
+    }
+
+    .nav-link {
+      display: block;
+      padding: 6px 20px 6px 28px;
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 400;
+      text-decoration: none;
+      border-left: 2px solid transparent;
+      margin-left: 0;
+      transition: color 0.12s, background 0.12s;
+      cursor: pointer;
+    }
+
+    .nav-link:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.03);
+      text-decoration: none;
+    }
+
+    .nav-link.active {
+      color: var(--indigo-lt);
+      border-left-color: var(--indigo);
+      background: rgba(99, 102, 241, 0.08);
+      font-weight: 500;
+    }
+
+    .nav-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 12px 20px;
+    }
+
+    /* ── Content ──────────────────────────────────────────── */
+    .content {
+      margin-left: var(--sidebar-w);
+      flex: 1;
+      min-width: 0;
+      padding: 40px 48px 80px;
+      max-width: 900px;
+    }
+
+    .page {
+      display: none;
+    }
+
+    .page.active {
+      display: block;
+    }
+
+    /* ── Breadcrumb ───────────────────────────────────────── */
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--subtle);
+      margin-bottom: 24px;
+    }
+
+    .breadcrumb span {
+      color: var(--muted);
+    }
+
+    /* ── Typography ───────────────────────────────────────── */
+    .content h1 {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      line-height: 1.2;
+      margin-bottom: 16px;
+      color: var(--text);
+    }
+
+    .content h2 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-top: 40px;
+      margin-bottom: 12px;
+      color: var(--text);
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .content h3 {
+      font-size: 17px;
+      font-weight: 600;
+      margin-top: 28px;
+      margin-bottom: 10px;
+      color: var(--text);
+    }
+
+    .content h4 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-top: 20px;
+      margin-bottom: 8px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .content p {
+      color: var(--muted);
+      line-height: 1.75;
+      margin-bottom: 14px;
+    }
+
+    .content ul,
+    .content ol {
+      color: var(--muted);
+      line-height: 1.75;
+      margin-bottom: 14px;
+      padding-left: 24px;
+    }
+
+    .content li {
+      margin-bottom: 4px;
+    }
+
+    .content strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .content code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #93c5fd;
+    }
+
+    /* ── Code blocks ──────────────────────────────────────── */
+    .code-block {
+      margin: 16px 0;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border2);
+    }
+
+    .code-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface3);
+      padding: 8px 16px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: var(--subtle);
+    }
+
+    .copy-btn {
+      background: none;
+      border: 1px solid var(--border2);
+      color: var(--subtle);
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: color 0.12s, border-color 0.12s;
+    }
+
+    .copy-btn:hover {
+      color: var(--text);
+      border-color: var(--border2);
+    }
+
+    .code-block pre {
+      margin: 0 !important;
+      border-radius: 0 !important;
+      background: #0d1117 !important;
+      padding: 16px !important;
+      overflow-x: auto;
+      font-size: 12.5px !important;
+      line-height: 1.6 !important;
+    }
+
+    .code-block pre code {
+      background: none !important;
+      border: none !important;
+      padding: 0 !important;
+      color: inherit !important;
+    }
+
+    /* ── Callouts ─────────────────────────────────────────── */
+    .callout {
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin: 16px 0;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      font-size: 13.5px;
+      line-height: 1.65;
+    }
+
+    .callout-icon {
+      flex-shrink: 0;
+      margin-top: 1px;
+      font-size: 16px;
+    }
+
+    .callout.info {
+      background: rgba(99, 102, 241, 0.08);
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      color: #a5b4fc;
+    }
+
+    .callout.tip {
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      color: #6ee7b7;
+    }
+
+    .callout.warn {
+      background: rgba(245, 158, 11, 0.08);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+      color: #fcd34d;
+    }
+
+    .callout.danger {
+      background: rgba(244, 63, 94, 0.08);
+      border: 1px solid rgba(244, 63, 94, 0.2);
+      color: #fda4af;
+    }
+
+    /* ── Tables ───────────────────────────────────────────── */
+    .content table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 13.5px;
+    }
+
+    .content th {
+      background: var(--surface2);
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border2);
+    }
+
+    .content td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted);
+      vertical-align: top;
+    }
+
+    .content tr:last-child td {
+      border-bottom: none;
+    }
+
+    .content td code {
+      font-size: 11.5px;
+    }
+
+    /* ── Badges ───────────────────────────────────────────── */
+    .badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 5px;
+      margin-right: 4px;
+    }
+
+    .badge-get {
+      background: rgba(16, 185, 129, 0.15);
+      color: #6ee7b7;
+    }
+
+    .badge-post {
+      background: rgba(99, 102, 241, 0.15);
+      color: #a5b4fc;
+    }
+
+    .badge-patch {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fcd34d;
+    }
+
+    .badge-delete {
+      background: rgba(244, 63, 94, 0.15);
+      color: #fda4af;
+    }
+
+    .badge-put {
+      background: rgba(34, 211, 238, 0.15);
+      color: #67e8f9;
+    }
+
+    /* ── Endpoint rows ────────────────────────────────────── */
+    .endpoint {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin: 8px 0;
+      background: var(--surface2);
+    }
+
+    .endpoint code {
+      color: var(--text);
+    }
+
+    .endpoint p {
+      margin: 0;
+      font-size: 13px;
+    }
+
+    /* ── Navigation footer ────────────────────────────────── */
+    .page-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 56px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+    }
+
+    .page-nav-btn {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 12px 18px;
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      cursor: pointer;
+      background: none;
+      font-family: inherit;
+      transition: border-color 0.15s, background 0.15s;
+      text-decoration: none;
+    }
+
+    .page-nav-btn:hover {
+      border-color: var(--indigo);
+      background: rgba(99, 102, 241, 0.06);
+      text-decoration: none;
+    }
+
+    .page-nav-btn .dir {
+      font-size: 11px;
+      color: var(--subtle);
+      font-weight: 500;
+    }
+
+    .page-nav-btn .label {
+      font-size: 14px;
+      color: var(--indigo-lt);
+      font-weight: 600;
+    }
+
+    .page-nav-btn.right {
+      text-align: right;
+    }
+
+    /* ── Search results overlay ───────────────────────────── */
+    .search-results {
+      position: absolute;
+      top: calc(var(--topbar-h) + 4px);
+      left: 80px;
+      width: 400px;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 10px;
+      z-index: 300;
+      padding: 8px 0;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+      display: none;
+    }
+
+    .search-result-item {
+      padding: 10px 16px;
+      cursor: pointer;
+      font-size: 13px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .search-result-item:last-child {
+      border-bottom: none;
+    }
+
+    .search-result-item:hover {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .search-result-item .sr-title {
+      color: var(--text);
+      font-weight: 500;
+      margin-bottom: 2px;
+    }
+
+    .search-result-item .sr-section {
+      font-size: 11px;
+      color: var(--subtle);
+    }
+
+    /* ── Responsive ───────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+      }
+
+      .sidebar.open {
+        transform: translateX(0);
+      }
+
+      .content {
+        margin-left: 0;
+        padding: 24px 20px 60px;
+      }
+
+      .hamburger {
+        display: block;
+      }
+
+      .topbar-search {
+        max-width: 200px;
+      }
+
+      .search-results {
+        left: 16px;
+        width: calc(100vw - 32px);
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ── Top bar ──────────────────────────────────────────────── -->
+  <header class="topbar">
+    <button class="hamburger" onclick="toggleSidebar()" aria-label="Menu">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+        <rect y="3" width="20" height="2" rx="1" />
+        <rect y="9" width="20" height="2" rx="1" />
+        <rect y="15" width="20" height="2" rx="1" />
+      </svg>
+    </button>
+    <a href="https://www.odin-catalog.com" class="topbar-logo">
+      <img src="https://www.odin-catalog.com/logo-dark.png" alt="ODIN" />
+      ODIN Catalog
+    </a>
+    <span class="version-pill">v0.0.1-alpha</span>
+
+    <div class="topbar-search" style="position:relative">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+        <path
+          d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.099zm-5.242 1.656a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11z" />
+      </svg>
+      <input type="search" id="searchInput" placeholder="Search docs… (Ctrl+K)" autocomplete="off" />
+    </div>
+    <div id="searchResults" class="search-results"></div>
+
+    <div class="topbar-right">
+      <a href="https://www.odin-catalog.com">Marketing</a>
+      <a href="https://github.com/odin-catalog">GitHub</a>
+    </div>
+  </header>
+
+  <!-- ── Layout ───────────────────────────────────────────────── -->
+  <div class="layout">
+
+    <!-- ── Sidebar ──────────────────────────────────────────────── -->
+    <nav class="sidebar" id="sidebar">
+
+      <div class="nav-section">
+        <span class="nav-group-label">Getting Started</span>
+        <a class="nav-link active" onclick="show('intro')">Introduction</a>
+        <a class="nav-link" onclick="show('quickstart')">Quick Start</a>
+        <a class="nav-link" onclick="show('prereqs')">Prerequisites</a>
+        <a class="nav-link" onclick="show('config')">Configuration</a>
+      </div>
+
+      <div class="nav-divider"></div>
+
+      <div class="nav-section">
+        <span class="nav-group-label">Architecture</span>
+        <a class="nav-link" onclick="show('arch-overview')">Overview</a>
+        <a class="nav-link" onclick="show('arch-services')">Services</a>
+        <a class="nav-link" onclick="show('arch-events')">Event Topology</a>
+        <a class="nav-link" onclick="show('arch-security')">Security Model</a>
+      </div>
+
+      <div class="nav-divider"></div>
+
+      <div class="nav-section">
+        <span class="nav-group-label">Data Model</span>
+        <a class="nav-link" onclick="show('model-overview')">Metamodel Overview</a>
+        <a class="nav-link" onclick="show('model-dcat')">DCAT Datasets</a>
+        <a class="nav-link" onclick="show('model-dprod')">DPROD Data Products</a>
+        <a class="nav-link" onclick="show('model-csvw')">CSV-W Physical Schema</a>
+        <a class="nav-link" onclick="show('model-logical')">Logical Models</a>
+        <a class="nav-link" onclick="show('model-vocab')">Vocabulary &amp; FIBO</a>
+        <a class="nav-link" onclick="show('model-lineage')">OpenLineage</a>
+      </div>
+
+      <div class="nav-divider"></div>
+
+      <div class="nav-section">
+        <span class="nav-group-label">Services</span>
+        <a class="nav-link" onclick="show('svc-catalog')">Catalog Service</a>
+        <a class="nav-link" onclick="show('svc-harvest')">Harvest Service</a>
+        <a class="nav-link" onclick="show('svc-lineage')">Lineage Service</a>
+        <a class="nav-link" onclick="show('svc-search')">Search Service</a>
+        <a class="nav-link" onclick="show('svc-ai')">AI Service</a>
+        <a class="nav-link" onclick="show('svc-identity')">Identity Service</a>
+      </div>
+
+      <div class="nav-divider"></div>
+
+      <div class="nav-section">
+        <span class="nav-group-label">API Reference</span>
+        <a class="nav-link" onclick="show('api-auth')">Authentication</a>
+        <a class="nav-link" onclick="show('api-catalog')">Catalog API</a>
+        <a class="nav-link" onclick="show('api-harvest')">Harvest API</a>
+        <a class="nav-link" onclick="show('api-lineage')">Lineage API</a>
+        <a class="nav-link" onclick="show('api-search')">Search API</a>
+        <a class="nav-link" onclick="show('api-ai')">AI API</a>
+      </div>
+
+      <div class="nav-divider"></div>
+
+      <div class="nav-section">
+        <span class="nav-group-label">Deployment</span>
+        <a class="nav-link" onclick="show('deploy-compose')">Docker Compose</a>
+        <a class="nav-link" onclick="show('deploy-env')">Environment Variables</a>
+        <a class="nav-link" onclick="show('deploy-k8s')">Kubernetes (Helm)</a>
+      </div>
+
+      <div class="nav-divider"></div>
+
+      <div class="nav-section">
+        <span class="nav-group-label">Contributing</span>
+        <a class="nav-link" onclick="show('contrib-dev')">Local Development</a>
+        <a class="nav-link" onclick="show('contrib-guide')">Contribution Guide</a>
+      </div>
+
+    </nav>
+
+    <!-- ── Main content ──────────────────────────────────────────── -->
+    <main class="content">
+
+      <!-- ════════════════════════════════════════════════════════════
+     INTRODUCTION
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page active" id="page-intro" data-title="Introduction" data-section="Getting Started">
+        <div class="breadcrumb"><span>Docs</span> › <span>Getting Started</span> › Introduction</div>
+        <h1>Introduction</h1>
+        <p>ODIN Catalog is an open-source data catalog built on W3C and OMG standards. It bridges the gap between raw
+          technical metadata and business understanding — giving data teams a semantic layer, end-to-end lineage, and
+          AI-powered discovery out of the box.</p>
+
+        <h2>What makes ODIN different</h2>
+        <p>Most data catalogs stop at documentation. ODIN goes further:</p>
+        <ul>
+          <li><strong>Semantic vocabulary mappings</strong> — every data element can be bound to a concept in FIBO,
+            schema.org, or your own ontology using SKOS match types.</li>
+          <li><strong>Live lineage graph</strong> — OpenLineage events and SQL DDL are parsed into an Apache AGE
+            property graph queryable by Cypher.</li>
+          <li><strong>Data product governance</strong> — the DPROD standard gives every dataset a business owner,
+            lifecycle stage, and access policy.</li>
+          <li><strong>AI-powered Q&amp;A</strong> — a Spring AI RAG pipeline runs over your metadata corpus using Ollama
+            (local) or OpenAI.</li>
+          <li><strong>Zero lock-in</strong> — all metadata is exportable as DCAT 3.0 JSON-LD.</li>
+        </ul>
+
+        <h2>Standards at the core</h2>
+        <table>
+          <tr>
+            <th>Standard</th>
+            <th>Body</th>
+            <th>Role in ODIN</th>
+          </tr>
+          <tr>
+            <td><strong>DCAT 3.0</strong></td>
+            <td>W3C</td>
+            <td>Catalog, Dataset, Distribution, DataService resources</td>
+          </tr>
+          <tr>
+            <td><strong>DPROD</strong></td>
+            <td>OMG</td>
+            <td>DataProduct, Port, lifecycle, access policy</td>
+          </tr>
+          <tr>
+            <td><strong>CSV-W</strong></td>
+            <td>W3C</td>
+            <td>Physical schema (table, column, datatype) harvested from source systems</td>
+          </tr>
+          <tr>
+            <td><strong>OpenLineage</strong></td>
+            <td>Linux Foundation</td>
+            <td>Job/Run/Dataset lineage events ingested via REST</td>
+          </tr>
+          <tr>
+            <td><strong>FIBO</strong></td>
+            <td>EDM Council</td>
+            <td>Pre-loaded financial ontology vocabulary (FND, FBC, SEC, MD)</td>
+          </tr>
+          <tr>
+            <td><strong>SKOS</strong></td>
+            <td>W3C</td>
+            <td>Mapping properties: exactMatch, closeMatch, relatedMatch</td>
+          </tr>
+        </table>
+
+        <div class="callout info">
+          <span class="callout-icon">ℹ</span>
+          <div>ODIN is currently in <strong>private alpha</strong>. APIs and database schemas may change between
+            releases. Not recommended for production workloads yet.</div>
+        </div>
+
+        <div class="page-nav">
+          <div></div>
+          <a class="page-nav-btn right" onclick="show('quickstart')">
+            <span class="dir">Next →</span>
+            <span class="label">Quick Start</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     QUICK START
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-quickstart" data-title="Quick Start" data-section="Getting Started">
+        <div class="breadcrumb"><span>Docs</span> › <span>Getting Started</span> › Quick Start</div>
+        <h1>Quick Start</h1>
+        <p>Get a full ODIN stack running locally in under five minutes using Docker Compose.</p>
+
+        <h2>1. Clone and configure</h2>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="language-bash">git clone https://github.com/odin-catalog/odin.git
+cd odin
+cp .env.example .env          # review and edit credentials</code></pre>
+        </div>
+
+        <h2>2. Start the stack</h2>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="language-bash">make up
+# or: docker compose up -d
+
+# Watch services come healthy:
+docker compose ps</code></pre>
+        </div>
+        <p>Services start in dependency order. Allow ~60 seconds for Kafka, PostgreSQL, and OpenSearch to initialise
+          before the Spring Boot services become healthy.</p>
+
+        <h2>3. Create your first dataset</h2>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="language-bash">curl -s -X POST http://localhost:8001/api/v1/datasets \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: dev-local" \
+  -H "X-Tenant-Id: 00000000-0000-0000-0000-000000000001" \
+  -d '{
+    "title": "Trade Blotter",
+    "description": "Intraday trade records from the front-office OMS.",
+    "keywords": ["trading", "blotter", "positions"],
+    "accrualPeriodicity": "daily"
+  }' | jq .</code></pre>
+        </div>
+
+        <h2>4. Open the frontend</h2>
+        <table>
+          <tr>
+            <th>App</th>
+            <th>URL</th>
+            <th>Purpose</th>
+          </tr>
+          <tr>
+            <td>Producer (management)</td>
+            <td><code>http://localhost:3000</code></td>
+            <td>Publish, govern, harvest</td>
+          </tr>
+          <tr>
+            <td>Consumer (discovery)</td>
+            <td><code>http://localhost:3001</code></td>
+            <td>Search, explore, ask AI</td>
+          </tr>
+        </table>
+
+        <div class="callout tip">
+          <span class="callout-icon">✓</span>
+          <div>The dev API key <code>X-API-Key: dev-*</code> (any value starting with <code>dev-</code>) grants full
+            <code>catalog:admin</code> scope and bypasses Keycloak. Use it for local smoke testing only.
+          </div>
+        </div>
+
+        <h2>5. Load sample data</h2>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="language-bash">make seed        # loads financial services sample data
+make reindex     # pushes all datasets into OpenSearch</code></pre>
+        </div>
+        <p>The seed script creates 12 financial datasets, 5 data products, logical models with FIBO vocabulary mappings,
+          and OpenLineage pipeline events for a BCBS 239 risk aggregation scenario.</p>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('intro')">
+            <span class="dir">← Previous</span><span class="label">Introduction</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('prereqs')">
+            <span class="dir">Next →</span><span class="label">Prerequisites</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     PREREQUISITES
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-prereqs" data-title="Prerequisites" data-section="Getting Started">
+        <div class="breadcrumb"><span>Docs</span> › <span>Getting Started</span> › Prerequisites</div>
+        <h1>Prerequisites</h1>
+
+        <h2>Runtime requirements</h2>
+        <table>
+          <tr>
+            <th>Requirement</th>
+            <th>Minimum version</th>
+            <th>Notes</th>
+          </tr>
+          <tr>
+            <td>Docker</td>
+            <td>25.0</td>
+            <td>Docker Desktop or Docker Engine on Linux</td>
+          </tr>
+          <tr>
+            <td>Docker Compose</td>
+            <td>v2.24</td>
+            <td>Bundled with Docker Desktop; <code>docker compose</code> (v2 plugin)</td>
+          </tr>
+          <tr>
+            <td>RAM</td>
+            <td>12 GB available</td>
+            <td>OpenSearch and Kafka are the largest consumers</td>
+          </tr>
+          <tr>
+            <td>Disk</td>
+            <td>8 GB free</td>
+            <td>Container images + volumes</td>
+          </tr>
+        </table>
+
+        <h2>Development requirements</h2>
+        <table>
+          <tr>
+            <th>Requirement</th>
+            <th>Version</th>
+            <th>Notes</th>
+          </tr>
+          <tr>
+            <td>Java</td>
+            <td>21 (LTS)</td>
+            <td>Required to build services; virtual threads (Project Loom)</td>
+          </tr>
+          <tr>
+            <td>Gradle</td>
+            <td>8.x</td>
+            <td>Wrapper included; run <code>./gradlew</code></td>
+          </tr>
+          <tr>
+            <td>Node.js</td>
+            <td>20 LTS</td>
+            <td>Required for frontend builds</td>
+          </tr>
+          <tr>
+            <td>pnpm</td>
+            <td>9.x</td>
+            <td><code>npm install -g pnpm</code></td>
+          </tr>
+        </table>
+
+        <h2>Optional — AI features</h2>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="language-bash"># Install Ollama for local LLM inference
+curl -fsSL https://ollama.ai/install.sh | sh
+ollama pull nomic-embed-text   # embedding model (768 dimensions)
+ollama pull llama3             # chat model
+
+# Then start the AI profile:
+docker compose --profile ai up -d</code></pre>
+        </div>
+        <p>Without Ollama, the ai-service will not start. All other services function normally. You can also configure
+          an OpenAI key in <code>.env</code> instead.</p>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('quickstart')">
+            <span class="dir">← Previous</span><span class="label">Quick Start</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('config')">
+            <span class="dir">Next →</span><span class="label">Configuration</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     CONFIGURATION
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-config" data-title="Configuration" data-section="Getting Started">
+        <div class="breadcrumb"><span>Docs</span> › <span>Getting Started</span> › Configuration</div>
+        <h1>Configuration</h1>
+        <p>All runtime configuration is driven by environment variables. Copy <code>.env.example</code> to
+          <code>.env</code> and edit before running <code>make up</code>.
+        </p>
+
+        <h2>Core variables</h2>
+        <table>
+          <tr>
+            <th>Variable</th>
+            <th>Default</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td><code>POSTGRES_PASSWORD</code></td>
+            <td><code>odin</code></td>
+            <td>Shared password for all Postgres instances (change in production)</td>
+          </tr>
+          <tr>
+            <td><code>KEYCLOAK_ADMIN</code></td>
+            <td><code>admin</code></td>
+            <td>Keycloak admin username</td>
+          </tr>
+          <tr>
+            <td><code>KEYCLOAK_ADMIN_PASSWORD</code></td>
+            <td><code>admin</code></td>
+            <td>Keycloak admin password</td>
+          </tr>
+          <tr>
+            <td><code>MINIO_ROOT_USER</code></td>
+            <td><code>minio</code></td>
+            <td>MinIO root access key</td>
+          </tr>
+          <tr>
+            <td><code>MINIO_ROOT_PASSWORD</code></td>
+            <td><code>minio123</code></td>
+            <td>MinIO root secret key</td>
+          </tr>
+          <tr>
+            <td><code>JWT_SECRET</code></td>
+            <td>—</td>
+            <td>HS256 secret for dev API key validation (32+ chars)</td>
+          </tr>
+        </table>
+
+        <h2>AI variables</h2>
+        <table>
+          <tr>
+            <th>Variable</th>
+            <th>Default</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td><code>OLLAMA_BASE_URL</code></td>
+            <td><code>http://ollama:11434</code></td>
+            <td>Ollama inference endpoint</td>
+          </tr>
+          <tr>
+            <td><code>OPENAI_API_KEY</code></td>
+            <td>(empty)</td>
+            <td>If set, OpenAI is used for embeddings and chat instead of Ollama</td>
+          </tr>
+          <tr>
+            <td><code>AI_CHAT_MODEL</code></td>
+            <td><code>llama3</code></td>
+            <td>Ollama model name for chat completions</td>
+          </tr>
+          <tr>
+            <td><code>AI_EMBED_MODEL</code></td>
+            <td><code>nomic-embed-text</code></td>
+            <td>Embedding model; must produce 768-dimension vectors</td>
+          </tr>
+        </table>
+
+        <div class="callout warn">
+          <span class="callout-icon">⚠</span>
+          <div>The default <code>.env.example</code> values are intentionally weak. Change all passwords and secrets
+            before exposing any port to a network.</div>
+        </div>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('prereqs')">
+            <span class="dir">← Previous</span><span class="label">Prerequisites</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('arch-overview')">
+            <span class="dir">Next →</span><span class="label">Architecture Overview</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     ARCHITECTURE OVERVIEW
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-arch-overview" data-title="Architecture Overview" data-section="Architecture">
+        <div class="breadcrumb"><span>Docs</span> › <span>Architecture</span> › Overview</div>
+        <h1>Architecture Overview</h1>
+        <p>ODIN follows Domain-Driven Design with a database-per-service pattern. Six Spring Boot 3.3 microservices
+          communicate via Kafka events. Traefik routes external HTTP traffic.</p>
+
+        <div class="code-block">
+          <div class="code-header"><span>topology</span></div>
+          <pre><code>Browser / CLI
+    │
+    ▼
+Traefik (port 80/443)
+    ├── catalog.local/          → consumer-frontend (nginx, port 3001)
+    ├── manage.catalog.local/   → producer-frontend (nginx, port 3000)
+    └── api.catalog.local/      → services (ports 8001–8006)
+            │
+            ├── catalog-service  :8001  PostgreSQL :5433
+            ├── harvest-service  :8002  PostgreSQL :5434 + MinIO :9000
+            ├── lineage-service  :8003  PostgreSQL+AGE :5435
+            ├── search-service   :8004  OpenSearch :9200
+            ├── ai-service       :8005  PostgreSQL+pgvector :5437
+            └── identity-service :8006  PostgreSQL :5436 + Keycloak :8180
+                    │
+                    └─── Apache Kafka :9092 (KRaft, no ZooKeeper)</code></pre>
+        </div>
+
+        <h2>Design principles</h2>
+        <ul>
+          <li><strong>API-first</strong> — every capability is a versioned REST endpoint before any UI is built on top.
+          </li>
+          <li><strong>Database-per-service</strong> — no service shares a database with another. Cross-service reads go
+            through REST or Kafka events.</li>
+          <li><strong>Event-driven</strong> — state changes publish Kafka events on log-compacted topics. Downstream
+            services maintain their own read models.</li>
+          <li><strong>Standards-based exports</strong> — the catalog exports DCAT 3.0 JSON-LD via Apache Jena; the
+            lineage service accepts OpenLineage JSON.</li>
+        </ul>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('config')">
+            <span class="dir">← Previous</span><span class="label">Configuration</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('arch-services')">
+            <span class="dir">Next →</span><span class="label">Services</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     ARCHITECTURE — SERVICES
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-arch-services" data-title="Services" data-section="Architecture">
+        <div class="breadcrumb"><span>Docs</span> › <span>Architecture</span> › Services</div>
+        <h1>Services</h1>
+        <table>
+          <tr>
+            <th>Service</th>
+            <th>Port</th>
+            <th>Database</th>
+            <th>Responsibility</th>
+          </tr>
+          <tr>
+            <td><strong>catalog-service</strong></td>
+            <td>8001</td>
+            <td>PostgreSQL 16</td>
+            <td>DCAT/DPROD/CSV-W metadata, logical models, vocabulary mappings, Kafka event publisher</td>
+          </tr>
+          <tr>
+            <td><strong>harvest-service</strong></td>
+            <td>8002</td>
+            <td>PostgreSQL 16 + MinIO</td>
+            <td>Spring Batch crawlers for Snowflake, AWS Glue, Teradata, DCAT HTTP; Quartz scheduler</td>
+          </tr>
+          <tr>
+            <td><strong>lineage-service</strong></td>
+            <td>8003</td>
+            <td>PostgreSQL + Apache AGE</td>
+            <td>OpenLineage REST ingestion, DDL parsing via Calcite, Cypher graph queries</td>
+          </tr>
+          <tr>
+            <td><strong>search-service</strong></td>
+            <td>8004</td>
+            <td>OpenSearch 2.x</td>
+            <td>Full-text + semantic indexing, FIBO facets, autocomplete suggestions</td>
+          </tr>
+          <tr>
+            <td><strong>ai-service</strong></td>
+            <td>8005</td>
+            <td>PostgreSQL + pgvector</td>
+            <td>Spring AI RAG pipeline, embeddings, SSE chat streaming, Ollama / OpenAI</td>
+          </tr>
+          <tr>
+            <td><strong>identity-service</strong></td>
+            <td>8006</td>
+            <td>PostgreSQL 16</td>
+            <td>Keycloak OAuth2/OIDC integration, ABAC policies, API keys, tenant management</td>
+          </tr>
+        </table>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('arch-overview')">
+            <span class="dir">← Previous</span><span class="label">Architecture Overview</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('arch-events')">
+            <span class="dir">Next →</span><span class="label">Event Topology</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     EVENT TOPOLOGY
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-arch-events" data-title="Event Topology" data-section="Architecture">
+        <div class="breadcrumb"><span>Docs</span> › <span>Architecture</span> › Event Topology</div>
+        <h1>Event Topology</h1>
+        <p>All inter-service communication uses Kafka with an envelope schema that carries tenant, event type, and
+          schema version on every message.</p>
+
+        <h2>Topics</h2>
+        <table>
+          <tr>
+            <th>Topic</th>
+            <th>Producer</th>
+            <th>Consumers</th>
+            <th>Compacted</th>
+          </tr>
+          <tr>
+            <td><code>catalog.datasets.changes</code></td>
+            <td>catalog-service</td>
+            <td>search-service, ai-service</td>
+            <td>Yes</td>
+          </tr>
+          <tr>
+            <td><code>catalog.data-products.changes</code></td>
+            <td>catalog-service</td>
+            <td>search-service, ai-service</td>
+            <td>Yes</td>
+          </tr>
+          <tr>
+            <td><code>harvest.entities.discovered</code></td>
+            <td>harvest-service</td>
+            <td>catalog-service</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td><code>harvest.ddl.discovered</code></td>
+            <td>harvest-service</td>
+            <td>lineage-service</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td><code>lineage.graph.updated</code></td>
+            <td>lineage-service</td>
+            <td>search-service</td>
+            <td>No</td>
+          </tr>
+        </table>
+
+        <h2>Event envelope</h2>
+        <div class="code-block">
+          <div class="code-header"><span>json</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="language-json">{
+  "eventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "eventType": "DatasetCreated",
+  "schemaVersion": "1.0",
+  "producerService": "catalog-service",
+  "tenantId": "00000000-0000-0000-0000-000000000001",
+  "timestamp": "2026-05-18T10:23:00Z",
+  "payload": { ... }
+}</code></pre>
+        </div>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('arch-services')">
+            <span class="dir">← Previous</span><span class="label">Services</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('arch-security')">
+            <span class="dir">Next →</span><span class="label">Security Model</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     SECURITY MODEL
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-arch-security" data-title="Security Model" data-section="Architecture">
+        <div class="breadcrumb"><span>Docs</span> › <span>Architecture</span> › Security Model</div>
+        <h1>Security Model</h1>
+
+        <h2>Authentication methods</h2>
+        <table>
+          <tr>
+            <th>Method</th>
+            <th>Header</th>
+            <th>Use case</th>
+          </tr>
+          <tr>
+            <td>Bearer JWT (OIDC)</td>
+            <td><code>Authorization: Bearer &lt;token&gt;</code></td>
+            <td>User sessions via Keycloak</td>
+          </tr>
+          <tr>
+            <td>API Key</td>
+            <td><code>X-API-Key: &lt;key&gt;</code></td>
+            <td>Service-to-service, CI pipelines, curl</td>
+          </tr>
+          <tr>
+            <td>Dev key</td>
+            <td><code>X-API-Key: dev-*</code></td>
+            <td>Local development only — bypasses auth entirely</td>
+          </tr>
+        </table>
+
+        <h2>Tenant isolation</h2>
+        <p>Every resource row carries a <code>tenant_id</code> UUID. The <code>X-Tenant-Id</code> header (set by Traefik
+          or the frontend nginx) scopes all queries. Rows from other tenants are never returned.</p>
+
+        <div class="callout danger">
+          <span class="callout-icon">✕</span>
+          <div>Never use <code>X-API-Key: dev-*</code> in production. It grants unrestricted admin access to all
+            tenants.</div>
+        </div>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('arch-events')">
+            <span class="dir">← Previous</span><span class="label">Event Topology</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('model-overview')">
+            <span class="dir">Next →</span><span class="label">Metamodel Overview</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     METAMODEL OVERVIEW
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-model-overview" data-title="Metamodel Overview" data-section="Data Model">
+        <div class="breadcrumb"><span>Docs</span> › <span>Data Model</span> › Metamodel Overview</div>
+        <h1>Metamodel Overview</h1>
+        <p>ODIN's metamodel has three tiers: conceptual (business), logical (semantic), and physical (technical).</p>
+
+        <div class="code-block">
+          <div class="code-header"><span>diagram</span></div>
+          <pre><code>Conceptual   DataProduct (DPROD)
+               ├── InputPort  → DataService
+               └── OutputPort → DataService → Distribution
+
+Logical      Dataset (DCAT)
+               ├── VocabularyProfile → Vocabulary (FIBO / schema.org)
+               └── LogicalModel
+                     └── LogicalDataElement
+                           ├── physicalColumnId ──FK──┐
+                           └── VocabularyMapping      │ (SKOS)
+                                                      │
+Physical     Distribution (DCAT)                      │
+               └── CSVWTable → CSVWSchema → CSVWColumn ◄┘
+
+Lineage      OpenLineage Job ─[READS_FROM/WRITES_TO]→ Dataset
+             (stored in Apache AGE graph, linked to DCAT Dataset)</code></pre>
+        </div>
+
+        <h2>Layer responsibilities</h2>
+        <table>
+          <tr>
+            <th>Layer</th>
+            <th>Key entities</th>
+            <th>Purpose</th>
+          </tr>
+          <tr>
+            <td>Conceptual</td>
+            <td>DataProduct, Port, DataService</td>
+            <td>Business ownership, governance, lifecycle (Ideation → Consume)</td>
+          </tr>
+          <tr>
+            <td>Logical</td>
+            <td>LogicalModel, LogicalDataElement, VocabularyMapping</td>
+            <td>Business meaning, semantic annotations, vocabulary alignment</td>
+          </tr>
+          <tr>
+            <td>Physical</td>
+            <td>Distribution, CSVWTable, CSVWColumn</td>
+            <td>Technical structure as harvested from source systems</td>
+          </tr>
+        </table>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('arch-security')">
+            <span class="dir">← Previous</span><span class="label">Security Model</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('model-dcat')">
+            <span class="dir">Next →</span><span class="label">DCAT Datasets</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     DCAT DATASETS
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-model-dcat" data-title="DCAT Datasets" data-section="Data Model">
+        <div class="breadcrumb"><span>Docs</span> › <span>Data Model</span> › DCAT Datasets</div>
+        <h1>DCAT Datasets &amp; Distributions</h1>
+        <p>ODIN models datasets and distributions using the <a href="https://www.w3.org/TR/vocab-dcat-3/">DCAT 3.0</a>
+          vocabulary. The full catalog can be exported as DCAT JSON-LD.</p>
+
+        <h2>Dataset fields</h2>
+        <table>
+          <tr>
+            <th>Field</th>
+            <th>DCAT property</th>
+            <th>Type</th>
+            <th>Notes</th>
+          </tr>
+          <tr>
+            <td><code>title</code></td>
+            <td><code>dct:title</code></td>
+            <td>string</td>
+            <td>Human-readable name</td>
+          </tr>
+          <tr>
+            <td><code>description</code></td>
+            <td><code>dct:description</code></td>
+            <td>string</td>
+            <td>Free-text description</td>
+          </tr>
+          <tr>
+            <td><code>keywords</code></td>
+            <td><code>dcat:keyword</code></td>
+            <td>string[]</td>
+            <td>Used for search facets</td>
+          </tr>
+          <tr>
+            <td><code>themes</code></td>
+            <td><code>dcat:theme</code></td>
+            <td>string[]</td>
+            <td>Domain classification IRIs</td>
+          </tr>
+          <tr>
+            <td><code>accrualPeriodicity</code></td>
+            <td><code>dct:accrualPeriodicity</code></td>
+            <td>string</td>
+            <td>e.g. <code>daily</code>, <code>hourly</code></td>
+          </tr>
+          <tr>
+            <td><code>license</code></td>
+            <td><code>dct:license</code></td>
+            <td>URI</td>
+            <td>License IRI</td>
+          </tr>
+          <tr>
+            <td><code>conformsTo</code></td>
+            <td><code>dct:conformsTo</code></td>
+            <td>URI[]</td>
+            <td>Standards this dataset conforms to</td>
+          </tr>
+        </table>
+
+        <h2>DCAT export</h2>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="language-bash"># Export full catalog as DCAT 3.0 JSON-LD
+curl http://localhost:8001/api/v1/catalogs/{id}/export \
+  -H "Accept: application/ld+json" \
+  -H "X-API-Key: dev-local"</code></pre>
+        </div>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('model-overview')">
+            <span class="dir">← Previous</span><span class="label">Metamodel Overview</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('model-dprod')">
+            <span class="dir">Next →</span><span class="label">DPROD Data Products</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     DPROD DATA PRODUCTS
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-model-dprod" data-title="DPROD Data Products" data-section="Data Model">
+        <div class="breadcrumb"><span>Docs</span> › <span>Data Model</span> › DPROD Data Products</div>
+        <h1>DPROD Data Products</h1>
+        <p>Data products are modelled using the <a href="https://www.omg.org/spec/DPROD/">OMG DPROD standard</a>. A data
+          product represents a business-owned, governed unit of data with a defined lifecycle.</p>
+
+        <h2>Lifecycle stages</h2>
+        <table>
+          <tr>
+            <th>Stage</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td><strong>Ideation</strong></td>
+            <td>Concept identified; no data yet</td>
+          </tr>
+          <tr>
+            <td><strong>Design</strong></td>
+            <td>Schema and SLA being defined</td>
+          </tr>
+          <tr>
+            <td><strong>Build</strong></td>
+            <td>Pipeline under development</td>
+          </tr>
+          <tr>
+            <td><strong>Deploy</strong></td>
+            <td>Running in production, not yet published</td>
+          </tr>
+          <tr>
+            <td><strong>Consume</strong></td>
+            <td>Publicly available for consumers</td>
+          </tr>
+        </table>
+
+        <h2>Create a data product</h2>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="language-bash">curl -X POST http://localhost:8001/api/v1/data-products \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: dev-local" \
+  -d '{
+    "title": "Trade Risk Data Product",
+    "description": "Aggregated risk metrics for regulatory reporting.",
+    "lifecycleStatus": "Consume",
+    "keywords": ["risk", "trading", "BCBS239"],
+    "informationSensitivity": "Internal"
+  }'</code></pre>
+        </div>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('model-dcat')">
+            <span class="dir">← Previous</span><span class="label">DCAT Datasets</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('model-csvw')">
+            <span class="dir">Next →</span><span class="label">CSV-W Physical Schema</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     LOGICAL MODELS
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-model-csvw" data-title="CSV-W Physical Schema" data-section="Data Model">
+        <div class="breadcrumb"><span>Docs</span> › <span>Data Model</span> › CSV-W Physical Schema</div>
+        <h1>CSV-W Physical Schema</h1>
+        <p>The physical layer is modelled using <a href="https://www.w3.org/TR/tabular-data-primer/">CSV on the Web
+            (CSV-W)</a>. Each distribution that is harvested from a source system produces a <code>CSVWTable</code> with
+          a <code>CSVWSchema</code> containing one <code>CSVWColumn</code> per field.</p>
+
+        <h2>Column fields</h2>
+        <table>
+          <tr>
+            <th>Field</th>
+            <th>Type</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td><code>name</code></td>
+            <td>string</td>
+            <td>Column name as it appears in the source system</td>
+          </tr>
+          <tr>
+            <td><code>titles</code></td>
+            <td>string[]</td>
+            <td>Alternate names / aliases</td>
+          </tr>
+          <tr>
+            <td><code>datatype</code></td>
+            <td>string</td>
+            <td>Source system type: <code>DECIMAL(18,4)</code>, <code>VARCHAR(50)</code>, etc.</td>
+          </tr>
+          <tr>
+            <td><code>required</code></td>
+            <td>boolean</td>
+            <td>Whether the column is NOT NULL</td>
+          </tr>
+          <tr>
+            <td><code>description</code></td>
+            <td>string</td>
+            <td>Column comment from the source DDL</td>
+          </tr>
+          <tr>
+            <td><code>propertyUrl</code></td>
+            <td>URI</td>
+            <td>Linked Data property IRI if available</td>
+          </tr>
+        </table>
+
+        <p>Physical columns are created automatically during harvest. A <code>physicalColumnId</code> UUID is assigned
+          to each and can be referenced from a <code>LogicalDataElement</code> to create the logical–physical binding.
+        </p>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('model-dprod')">
+            <span class="dir">← Previous</span><span class="label">DPROD Data Products</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('model-logical')">
+            <span class="dir">Next →</span><span class="label">Logical Models</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     LOGICAL MODELS
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-model-logical" data-title="Logical Models" data-section="Data Model">
+        <div class="breadcrumb"><span>Docs</span> › <span>Data Model</span> › Logical Models</div>
+        <h1>Logical Models</h1>
+        <p>A <strong>LogicalModel</strong> belongs to a Dataset and provides the business-oriented view of its
+          structure. It contains <strong>LogicalDataElements</strong> — each representing a named business concept with
+          an optional binding to a physical column and zero or more vocabulary mappings.</p>
+
+        <h2>LogicalDataElement fields</h2>
+        <table>
+          <tr>
+            <th>Field</th>
+            <th>Type</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td><code>name</code></td>
+            <td>string</td>
+            <td>Business name: <em>Trade Amount</em>, <em>Settlement Currency</em></td>
+          </tr>
+          <tr>
+            <td><code>logicalType</code></td>
+            <td>string</td>
+            <td>Semantic type: <code>MonetaryAmount</code>, <code>Identifier</code>, <code>Date</code>,
+              <code>Party</code>
+            </td>
+          </tr>
+          <tr>
+            <td><code>physicalColumnId</code></td>
+            <td>UUID (nullable)</td>
+            <td>FK to harvested <code>csvw_columns</code> row; null until harvest or manual bind</td>
+          </tr>
+          <tr>
+            <td><code>isIdentifier</code></td>
+            <td>boolean</td>
+            <td>True if this element forms part of the logical primary key</td>
+          </tr>
+          <tr>
+            <td><code>isNullable</code></td>
+            <td>boolean</td>
+            <td>Whether the business concept permits absence of a value</td>
+          </tr>
+        </table>
+
+        <h2>Bind a physical column</h2>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="language-bash">curl -X POST \
+  http://localhost:8001/api/v1/logical-data-elements/{elementId}/bind \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: dev-local" \
+  -d '{ "physicalColumnId": "b3f1a2e4-..." }'</code></pre>
+        </div>
+
+        <h2>Auto-scaffold from harvest</h2>
+        <p>When a harvest run discovers columns for a dataset that has no published LogicalModel, ODIN automatically
+          generates a <em>draft</em> LogicalModel with one <code>LogicalDataElement</code> per <code>CSVWColumn</code>.
+          Each element has its <code>physicalColumnId</code> pre-bound and its <code>logicalType</code> inferred from
+          the source datatype. You can then enrich the draft with business names and vocabulary mappings.</p>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('model-csvw')">
+            <span class="dir">← Previous</span><span class="label">CSV-W Physical Schema</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('model-vocab')">
+            <span class="dir">Next →</span><span class="label">Vocabulary &amp; FIBO</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     VOCABULARY & FIBO
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-model-vocab" data-title="Vocabulary & FIBO" data-section="Data Model">
+        <div class="breadcrumb"><span>Docs</span> › <span>Data Model</span> › Vocabulary &amp; FIBO</div>
+        <h1>Vocabulary &amp; FIBO</h1>
+        <p>ODIN ships with six system vocabularies pre-loaded. You can register additional RDF vocabularies at any time.
+        </p>
+
+        <h2>Pre-loaded vocabularies</h2>
+        <table>
+          <tr>
+            <th>Vocabulary</th>
+            <th>Prefix</th>
+            <th>Type</th>
+            <th>Base IRI</th>
+          </tr>
+          <tr>
+            <td>schema.org</td>
+            <td><code>schema</code></td>
+            <td>general</td>
+            <td><code>https://schema.org/</code></td>
+          </tr>
+          <tr>
+            <td>FIBO FND</td>
+            <td><code>fibo-fnd</code></td>
+            <td>financial</td>
+            <td><code>https://spec.edmcouncil.org/fibo/ontology/FND/</code></td>
+          </tr>
+          <tr>
+            <td>FIBO FBC</td>
+            <td><code>fibo-fbc</code></td>
+            <td>financial</td>
+            <td><code>https://spec.edmcouncil.org/fibo/ontology/FBC/</code></td>
+          </tr>
+          <tr>
+            <td>FIBO SEC</td>
+            <td><code>fibo-sec</code></td>
+            <td>financial</td>
+            <td><code>https://spec.edmcouncil.org/fibo/ontology/SEC/</code></td>
+          </tr>
+          <tr>
+            <td>FIBO MD</td>
+            <td><code>fibo-md</code></td>
+            <td>financial</td>
+            <td><code>https://spec.edmcouncil.org/fibo/ontology/MD/</code></td>
+          </tr>
+          <tr>
+            <td>SKOS</td>
+            <td><code>skos</code></td>
+            <td>general</td>
+            <td><code>http://www.w3.org/2004/02/skos/core#</code></td>
+          </tr>
+        </table>
+
+        <h2>SKOS match types</h2>
+        <table>
+          <tr>
+            <th>Match type</th>
+            <th>When to use</th>
+          </tr>
+          <tr>
+            <td><code>exactMatch</code></td>
+            <td>The element represents precisely the same concept</td>
+          </tr>
+          <tr>
+            <td><code>closeMatch</code></td>
+            <td>Very similar but not identical (e.g. trade date ↔ schema:startDate)</td>
+          </tr>
+          <tr>
+            <td><code>relatedMatch</code></td>
+            <td>Related but distinct concepts</td>
+          </tr>
+          <tr>
+            <td><code>broadMatch</code></td>
+            <td>The vocabulary concept is broader / more general</td>
+          </tr>
+          <tr>
+            <td><code>narrowMatch</code></td>
+            <td>The vocabulary concept is narrower / more specific</td>
+          </tr>
+        </table>
+
+        <h2>Add a vocabulary mapping</h2>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="language-bash">curl -X POST \
+  http://localhost:8001/api/v1/logical-data-elements/{elementId}/vocab-mappings \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: dev-local" \
+  -d '{
+    "vocabularyId": "...",
+    "conceptIri": "https://spec.edmcouncil.org/fibo/ontology/FND/Accounting/CurrencyAmount/MonetaryAmount",
+    "conceptLabel": "MonetaryAmount",
+    "matchType": "exactMatch"
+  }'</code></pre>
+        </div>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('model-logical')">
+            <span class="dir">← Previous</span><span class="label">Logical Models</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('model-lineage')">
+            <span class="dir">Next →</span><span class="label">OpenLineage</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     OPENLINEAGE
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-model-lineage" data-title="OpenLineage" data-section="Data Model">
+        <div class="breadcrumb"><span>Docs</span> › <span>Data Model</span> › OpenLineage</div>
+        <h1>OpenLineage Integration</h1>
+        <p>ODIN's lineage-service exposes an OpenLineage-compatible HTTP endpoint. Any tool that emits OpenLineage
+          events (Spark, dbt, Airflow, Flink) can send lineage directly to ODIN.</p>
+
+        <h2>Send a lineage event</h2>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="language-bash">curl -X POST http://localhost:8003/api/v1/lineage \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: dev-local" \
+  -d '{
+    "eventType": "COMPLETE",
+    "eventTime": "2026-05-18T10:00:00Z",
+    "producer": "https://github.com/OpenLineage/OpenLineage/tree/main/integration/spark",
+    "schemaURL": "https://openlineage.io/spec/1-0-5/OpenLineage.json#/definitions/RunEvent",
+    "run": { "runId": "3fa85f64-5717-4562-b3fc-2c963f66afa6" },
+    "job": { "namespace": "TRADING_DB", "name": "risk_aggregation_job" },
+    "inputs":  [{ "namespace": "TRADING_DB.BLOTTER", "name": "TRADE_BLOTTER" }],
+    "outputs": [{ "namespace": "REGULATORY_DB.BCBS239", "name": "RISK_AGGREGATION" }]
+  }'</code></pre>
+        </div>
+
+        <h2>Query lineage graph</h2>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="language-bash"># Upstream lineage, 4 hops
+curl "http://localhost:8003/api/v1/datasets/REGULATORY_DB.BCBS239/RISK_AGGREGATION/lineage?direction=upstream&depth=4" \
+  -H "X-API-Key: dev-local"
+
+# Downstream impact analysis
+curl "http://localhost:8003/api/v1/datasets/TRADING_DB.BLOTTER/TRADE_BLOTTER/impact" \
+  -H "X-API-Key: dev-local"</code></pre>
+        </div>
+
+        <p>Lineage is stored in an Apache AGE property graph on PostgreSQL. Cypher queries traverse
+          <code>DERIVED_FROM</code>, <code>READ_BY</code>, and <code>WRITES_TO</code> edges. Column-level lineage uses
+          <code>COLUMN_LINEAGE</code> edges.
+        </p>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('model-vocab')">
+            <span class="dir">← Previous</span><span class="label">Vocabulary &amp; FIBO</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('svc-catalog')">
+            <span class="dir">Next →</span><span class="label">Catalog Service</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     CATALOG SERVICE
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-svc-catalog" data-title="Catalog Service" data-section="Services">
+        <div class="breadcrumb"><span>Docs</span> › <span>Services</span> › Catalog Service</div>
+        <h1>Catalog Service</h1>
+        <p>The catalog-service is the primary metadata store. It owns all DCAT, DPROD, CSV-W, logical model, and
+          vocabulary resources. All other services treat it as the source of truth.</p>
+
+        <h2>Key responsibilities</h2>
+        <ul>
+          <li>Persist and version DCAT Datasets, Distributions, DataServices, Catalogs</li>
+          <li>Persist DPROD DataProducts, Ports, and lifecycle transitions</li>
+          <li>Store CSV-W tables and columns (populated by harvest events)</li>
+          <li>Manage LogicalModels and LogicalDataElements with physical column bindings</li>
+          <li>Maintain the vocabulary registry and per-dataset vocabulary profiles</li>
+          <li>Export the full catalog as DCAT 3.0 JSON-LD via Apache Jena</li>
+          <li>Publish <code>catalog.*.changes</code> Kafka events on all mutations</li>
+        </ul>
+
+        <h2>Database</h2>
+        <p>PostgreSQL 16 on port 5433 (Docker). Migrations managed by Flyway. Key tables: <code>resources</code>,
+          <code>datasets</code>, <code>distributions</code>, <code>data_products</code>, <code>csvw_columns</code>,
+          <code>logical_models</code>, <code>logical_data_elements</code>, <code>vocabularies</code>.
+        </p>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('model-lineage')">
+            <span class="dir">← Previous</span><span class="label">OpenLineage</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('svc-harvest')">
+            <span class="dir">Next →</span><span class="label">Harvest Service</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     HARVEST SERVICE
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-svc-harvest" data-title="Harvest Service" data-section="Services">
+        <div class="breadcrumb"><span>Docs</span> › <span>Services</span> › Harvest Service</div>
+        <h1>Harvest Service</h1>
+        <p>The harvest-service crawls external data sources, normalises their metadata, and publishes it to Kafka for
+          the catalog-service to ingest. Jobs are scheduled with Quartz and executed as Spring Batch jobs.</p>
+
+        <h2>Supported connectors</h2>
+        <table>
+          <tr>
+            <th>Connector</th>
+            <th>Source type</th>
+            <th>What it harvests</th>
+          </tr>
+          <tr>
+            <td><code>dcat_http</code></td>
+            <td>Any DCAT HTTP endpoint</td>
+            <td>Datasets, distributions via Apache Jena (JSON-LD, Turtle, RDF/XML)</td>
+          </tr>
+          <tr>
+            <td><code>aws_glue</code></td>
+            <td>AWS Glue Data Catalog</td>
+            <td>Databases, tables, columns, partitions via AWS SDK v2</td>
+          </tr>
+          <tr>
+            <td><code>snowflake</code></td>
+            <td>Snowflake</td>
+            <td><code>SHOW TABLES</code>, <code>DESCRIBE TABLE</code>, <code>GET DDL</code></td>
+          </tr>
+          <tr>
+            <td><code>teradata</code></td>
+            <td>Teradata</td>
+            <td><code>DBC.TablesV</code>, <code>DBC.ColumnsV</code>, <code>DBC.ShowSQL</code></td>
+          </tr>
+        </table>
+
+        <h2>Configure a source</h2>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="language-bash">curl -X POST http://localhost:8002/api/v1/sources \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: dev-local" \
+  -d '{
+    "name": "Snowflake Production",
+    "sourceType": "snowflake",
+    "baseUrl": "orgname-accountname.snowflakecomputing.com",
+    "databaseName": "TRADING_DB",
+    "schemaFilter": ["BLOTTER", "RISK"],
+    "credentialRef": "vault://snowflake/prod"
+  }'</code></pre>
+        </div>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('svc-catalog')">
+            <span class="dir">← Previous</span><span class="label">Catalog Service</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('svc-lineage')">
+            <span class="dir">Next →</span><span class="label">Lineage Service</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     LINEAGE SERVICE
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-svc-lineage" data-title="Lineage Service" data-section="Services">
+        <div class="breadcrumb"><span>Docs</span> › <span>Services</span> › Lineage Service</div>
+        <h1>Lineage Service</h1>
+        <p>The lineage-service ingests OpenLineage events and DDL, persists them to PostgreSQL, and builds a property
+          graph in Apache AGE for multi-hop Cypher traversal.</p>
+
+        <h2>DDL lineage</h2>
+        <p>Submit raw DDL to extract lineage without running a pipeline:</p>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="language-bash">curl -X POST http://localhost:8003/api/v1/ddl/submit \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: dev-local" \
+  -d '{
+    "dialect": "SNOWFLAKE",
+    "ddl": "CREATE VIEW RISK_DB.MARKET_RISK.DAILY_POSITIONS AS SELECT t.*, p.close_price FROM TRADING_DB.BLOTTER.TRADE_BLOTTER t JOIN kafka://prices-realtime p ON t.instrument_id = p.instrument_id"
+  }'</code></pre>
+        </div>
+        <p>Apache Calcite parses the DDL across Snowflake, Teradata, and Hive dialects. A <code>DERIVED_FROM</code> edge
+          is created in the AGE graph between each source table and the view.</p>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('svc-harvest')">
+            <span class="dir">← Previous</span><span class="label">Harvest Service</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('svc-search')">
+            <span class="dir">Next →</span><span class="label">Search Service</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     SEARCH SERVICE
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-svc-search" data-title="Search Service" data-section="Services">
+        <div class="breadcrumb"><span>Docs</span> › <span>Services</span> › Search Service</div>
+        <h1>Search Service</h1>
+        <p>The search-service maintains an OpenSearch index that is enriched with logical model data, vocabulary concept
+          labels, and FIBO IRIs. It consumes Kafka events to stay in sync with the catalog.</p>
+
+        <h2>Search query</h2>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="language-bash"># Full-text search with filters
+curl "http://localhost:8004/api/v1/search?q=trade&type=dataset&domain=Finance&hasLineage=true" \
+  -H "X-API-Key: dev-local"
+
+# FIBO concept facet search
+curl "http://localhost:8004/api/v1/search?fibo_concept=MonetaryAmount" \
+  -H "X-API-Key: dev-local"
+
+# Autocomplete suggestions
+curl "http://localhost:8004/api/v1/search/suggest?q=trad" \
+  -H "X-API-Key: dev-local"</code></pre>
+        </div>
+
+        <h2>Reindex</h2>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="language-bash">curl -X POST http://localhost:8004/api/v1/admin/reindex \
+  -H "X-API-Key: dev-local"</code></pre>
+        </div>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('svc-lineage')">
+            <span class="dir">← Previous</span><span class="label">Lineage Service</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('svc-ai')">
+            <span class="dir">Next →</span><span class="label">AI Service</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     AI SERVICE
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-svc-ai" data-title="AI Service" data-section="Services">
+        <div class="breadcrumb"><span>Docs</span> › <span>Services</span> › AI Service</div>
+        <h1>AI Service</h1>
+        <p>The ai-service provides a RAG (Retrieval-Augmented Generation) pipeline over your metadata corpus using
+          Spring AI. It can run fully on-premises with Ollama or use the OpenAI API.</p>
+
+        <h2>Start a conversation</h2>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="language-bash"># Create a conversation
+CONV=$(curl -s -X POST http://localhost:8005/api/v1/conversations \
+  -H "X-API-Key: dev-local" -H "Content-Type: application/json" \
+  -d '{"title": "My session"}' | jq -r .id)
+
+# Ask a question (streaming SSE response)
+curl -N -X POST http://localhost:8005/api/v1/conversations/$CONV/messages \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: dev-local" \
+  -H "Accept: text/event-stream" \
+  -d '{"content": "Which datasets contain monetary amounts mapped to FIBO?"}'</code></pre>
+        </div>
+
+        <h2>Embedding pipeline</h2>
+        <p>The ai-service listens on <code>catalog.datasets.changes</code> and
+          <code>catalog.data-products.changes</code>. On each event it fetches the enriched entity from catalog-service,
+          chunks the text (title + description + element names + vocabulary labels), embeds the chunks using the
+          configured model, and upserts into the pgvector store.
+        </p>
+
+        <div class="callout tip">
+          <span class="callout-icon">✓</span>
+          <div>The ai-service is optional. Start it with
+            <code>docker compose --profile ai up -d ai-service ollama</code>. All other services run without it.
+          </div>
+        </div>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('svc-search')">
+            <span class="dir">← Previous</span><span class="label">Search Service</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('svc-identity')">
+            <span class="dir">Next →</span><span class="label">Identity Service</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     IDENTITY SERVICE
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-svc-identity" data-title="Identity Service" data-section="Services">
+        <div class="breadcrumb"><span>Docs</span> › <span>Services</span> › Identity Service</div>
+        <h1>Identity Service</h1>
+        <p>The identity-service manages organisations, users, roles, and access policies. It integrates with Keycloak 24
+          for OIDC token issuance and validation.</p>
+
+        <h2>Keycloak configuration</h2>
+        <p>A realm export is included at <code>infra/keycloak/realm-export.json</code>. The realm is imported
+          automatically on first startup. Keycloak runs on port 8180.</p>
+
+        <div class="callout info">
+          <span class="callout-icon">ℹ</span>
+          <div>Keycloak 24 uses <code>KEYCLOAK_ADMIN</code> and <code>KEYCLOAK_ADMIN_PASSWORD</code> environment
+            variables. The old <code>KC_BOOTSTRAP_ADMIN_*</code> variables are not supported.</div>
+        </div>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('svc-ai')">
+            <span class="dir">← Previous</span><span class="label">AI Service</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('api-auth')">
+            <span class="dir">Next →</span><span class="label">Authentication</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     API AUTH
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-api-auth" data-title="Authentication" data-section="API Reference">
+        <div class="breadcrumb"><span>Docs</span> › <span>API Reference</span> › Authentication</div>
+        <h1>Authentication</h1>
+
+        <h2>Request headers</h2>
+        <table>
+          <tr>
+            <th>Header</th>
+            <th>Required</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td><code>Authorization: Bearer &lt;jwt&gt;</code></td>
+            <td>One of these two</td>
+            <td>Keycloak OIDC access token</td>
+          </tr>
+          <tr>
+            <td><code>X-API-Key: &lt;key&gt;</code></td>
+            <td>One of these two</td>
+            <td>API key from identity-service</td>
+          </tr>
+          <tr>
+            <td><code>X-Tenant-Id: &lt;uuid&gt;</code></td>
+            <td>Yes</td>
+            <td>Tenant scoping — set by Traefik/nginx in production</td>
+          </tr>
+        </table>
+
+        <h2>Dev API key</h2>
+        <p>Any key starting with <code>dev-</code> bypasses authentication and grants <code>catalog:admin</code> scope.
+          The tenant ID defaults to <code>00000000-0000-0000-0000-000000000001</code>.</p>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="language-bash"># These are equivalent for local development:
+curl -H "X-API-Key: dev-anything" ...
+curl -H "X-API-Key: dev-local" ...
+curl -H "X-API-Key: dev-my-test-key" ...</code></pre>
+        </div>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('svc-identity')">
+            <span class="dir">← Previous</span><span class="label">Identity Service</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('api-catalog')">
+            <span class="dir">Next →</span><span class="label">Catalog API</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     CATALOG API
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-api-catalog" data-title="Catalog API" data-section="API Reference">
+        <div class="breadcrumb"><span>Docs</span> › <span>API Reference</span> › Catalog API</div>
+        <h1>Catalog API <small style="font-size:14px;color:var(--subtle);font-weight:400">:8001</small></h1>
+
+        <h2>Datasets</h2>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets</code>
+          <p>List datasets. Query params: <code>page</code>, <code>size</code>, <code>domain</code>,
+            <code>format</code>.
+          </p>
+        </div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/datasets</code>
+          <p>Create a new dataset.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets/{id}</code>
+          <p>Get dataset by ID.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-patch">PATCH</span><code>/api/v1/datasets/{id}</code>
+          <p>Partial update.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-delete">DELETE</span><code>/api/v1/datasets/{id}</code>
+          <p>Soft-delete a dataset.</p>
+        </div>
+
+        <h2>Data Products</h2>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/data-products</code>
+          <p>List. Query params: <code>lifecycleStatus</code>, <code>domain</code>.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/data-products</code>
+          <p>Create a data product.</p>
+        </div>
+        <div class="endpoint"><span
+            class="badge badge-patch">PATCH</span><code>/api/v1/data-products/{id}/lifecycle</code>
+          <p>Transition lifecycle: <code>{"status":"Deploy"}</code>.</p>
+        </div>
+
+        <h2>Logical Models</h2>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets/{id}/logical-models</code>
+          <p>List logical models for a dataset.</p>
+        </div>
+        <div class="endpoint"><span
+            class="badge badge-post">POST</span><code>/api/v1/datasets/{id}/logical-models</code>
+          <p>Create a new logical model.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/logical-models/{id}/elements</code>
+          <p>List data elements.</p>
+        </div>
+        <div class="endpoint"><span
+            class="badge badge-post">POST</span><code>/api/v1/logical-data-elements/{id}/bind</code>
+          <p>Bind element to a physical column.</p>
+        </div>
+        <div class="endpoint"><span
+            class="badge badge-post">POST</span><code>/api/v1/logical-data-elements/{id}/vocab-mappings</code>
+          <p>Add a SKOS vocabulary mapping.</p>
+        </div>
+
+        <h2>Vocabularies</h2>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/vocabularies</code>
+          <p>List all registered vocabularies.</p>
+        </div>
+        <div class="endpoint"><span
+            class="badge badge-get">GET</span><code>/api/v1/vocabularies/{id}/concepts/search</code>
+          <p>Search concepts. Query: <code>q=price&amp;limit=20</code>.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/catalogs/{id}/export</code>
+          <p>Export as DCAT JSON-LD. Set <code>Accept: application/ld+json</code>.</p>
+        </div>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('api-auth')">
+            <span class="dir">← Previous</span><span class="label">Authentication</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('api-harvest')">
+            <span class="dir">Next →</span><span class="label">Harvest API</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     HARVEST API
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-api-harvest" data-title="Harvest API" data-section="API Reference">
+        <div class="breadcrumb"><span>Docs</span> › <span>API Reference</span> › Harvest API</div>
+        <h1>Harvest API <small style="font-size:14px;color:var(--subtle);font-weight:400">:8002</small></h1>
+
+        <h2>Sources</h2>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/sources</code>
+          <p>List all harvest sources. Filter by <code>type</code>.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/sources</code>
+          <p>Register a new source.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/sources/{id}/test</code>
+          <p>Test connectivity to the source.</p>
+        </div>
+
+        <h2>Jobs &amp; Runs</h2>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/jobs</code>
+          <p>List harvest jobs.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/jobs</code>
+          <p>Create a scheduled or on-demand job.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/jobs/{id}/trigger</code>
+          <p>Trigger an immediate harvest run.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/jobs/{id}/cancel</code>
+          <p>Cancel a running job.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/runs/{id}/items</code>
+          <p>Inspect per-entity results of a run.</p>
+        </div>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('api-catalog')">
+            <span class="dir">← Previous</span><span class="label">Catalog API</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('api-lineage')">
+            <span class="dir">Next →</span><span class="label">Lineage API</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     LINEAGE API
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-api-lineage" data-title="Lineage API" data-section="API Reference">
+        <div class="breadcrumb"><span>Docs</span> › <span>API Reference</span> › Lineage API</div>
+        <h1>Lineage API <small style="font-size:14px;color:var(--subtle);font-weight:400">:8003</small></h1>
+
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/lineage</code>
+          <p>Ingest an OpenLineage RunEvent (START, RUNNING, COMPLETE, FAIL, ABORT).</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets/{ns}/{name}/lineage</code>
+          <p>Graph traversal. Params: <code>direction=upstream|downstream</code>, <code>depth=1..10</code>.</p>
+        </div>
+        <div class="endpoint"><span
+            class="badge badge-get">GET</span><code>/api/v1/datasets/{ns}/{name}/column-lineage</code>
+          <p>Column-level lineage. Params: <code>column</code>, <code>direction</code>.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets/{ns}/{name}/impact</code>
+          <p>Downstream impact analysis — all datasets that depend on this one.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/ddl/submit</code>
+          <p>Submit DDL for Calcite parsing. Body: <code>{"dialect":"SNOWFLAKE","ddl":"CREATE VIEW ..."}</code>.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/jobs/{ns}/{name}/runs</code>
+          <p>Run history for a job. Filter by <code>state</code>, <code>start</code>, <code>end</code>.</p>
+        </div>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('api-harvest')">
+            <span class="dir">← Previous</span><span class="label">Harvest API</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('api-search')">
+            <span class="dir">Next →</span><span class="label">Search API</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     SEARCH API
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-api-search" data-title="Search API" data-section="API Reference">
+        <div class="breadcrumb"><span>Docs</span> › <span>API Reference</span> › Search API</div>
+        <h1>Search API <small style="font-size:14px;color:var(--subtle);font-weight:400">:8004</small></h1>
+
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/search</code>
+          <p>Full-text search. Params: <code>q</code>, <code>type</code>, <code>domain</code>,
+            <code>lifecycleStatus</code>, <code>format</code>, <code>hasLineage</code>, <code>fibo_concept</code>,
+            <code>page</code>, <code>size</code>.
+          </p>
+        </div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/search/suggest</code>
+          <p>Autocomplete. Param: <code>q</code>. Returns up to 10 suggestions.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/search/saved</code>
+          <p>Save a search query for later reuse.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/admin/reindex</code>
+          <p>Trigger a full reindex from catalog-service. Admin only.</p>
+        </div>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('api-lineage')">
+            <span class="dir">← Previous</span><span class="label">Lineage API</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('api-ai')">
+            <span class="dir">Next →</span><span class="label">AI API</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     AI API
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-api-ai" data-title="AI API" data-section="API Reference">
+        <div class="breadcrumb"><span>Docs</span> › <span>API Reference</span> › AI API</div>
+        <h1>AI API <small style="font-size:14px;color:var(--subtle);font-weight:400">:8005</small></h1>
+
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/conversations</code>
+          <p>List conversations for the current user.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/conversations</code>
+          <p>Create a new conversation. Body: <code>{"title":"..."}</code>.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/conversations/{id}/messages</code>
+          <p>Send a message. Set <code>Accept: text/event-stream</code> for SSE streaming. Response tokens arrive as
+            <code>data: &lt;token&gt;</code> events.
+          </p>
+        </div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/semantic-search</code>
+          <p>Vector similarity search. Body: <code>{"query":"...","limit":10,"entityTypes":["dataset"]}</code>.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/admin/embeddings/refresh</code>
+          <p>Re-embed all documents. Admin only.</p>
+        </div>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('api-search')">
+            <span class="dir">← Previous</span><span class="label">Search API</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('deploy-compose')">
+            <span class="dir">Next →</span><span class="label">Docker Compose</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     DEPLOYMENT — DOCKER COMPOSE
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-deploy-compose" data-title="Docker Compose" data-section="Deployment">
+        <div class="breadcrumb"><span>Docs</span> › <span>Deployment</span> › Docker Compose</div>
+        <h1>Docker Compose</h1>
+        <p>The repository ships a <code>docker-compose.yml</code> that starts the full stack and a
+          <code>docker-compose.override.yml</code> for development hot-reload overrides.
+        </p>
+
+        <h2>Makefile targets</h2>
+        <table>
+          <tr>
+            <th>Target</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td><code>make up</code></td>
+            <td>Start all services in detached mode</td>
+          </tr>
+          <tr>
+            <td><code>make down</code></td>
+            <td>Stop and remove containers (preserves volumes)</td>
+          </tr>
+          <tr>
+            <td><code>make destroy</code></td>
+            <td>Stop containers and delete all volumes</td>
+          </tr>
+          <tr>
+            <td><code>make migrate</code></td>
+            <td>Run Flyway migrations manually</td>
+          </tr>
+          <tr>
+            <td><code>make seed</code></td>
+            <td>Load financial services sample data</td>
+          </tr>
+          <tr>
+            <td><code>make reindex</code></td>
+            <td>Full OpenSearch reindex</td>
+          </tr>
+          <tr>
+            <td><code>make build</code></td>
+            <td>Build all Docker images from source</td>
+          </tr>
+          <tr>
+            <td><code>make test</code></td>
+            <td>Run all service tests in Docker</td>
+          </tr>
+          <tr>
+            <td><code>make logs svc=catalog-service</code></td>
+            <td>Tail logs for a specific service</td>
+          </tr>
+        </table>
+
+        <h2>Profiles</h2>
+        <table>
+          <tr>
+            <th>Profile</th>
+            <th>Additional services</th>
+          </tr>
+          <tr>
+            <td>(default)</td>
+            <td>All 6 services + Kafka + PostgreSQL × 4 + OpenSearch + MinIO + Keycloak</td>
+          </tr>
+          <tr>
+            <td><code>ai</code></td>
+            <td>Adds ai-service and Ollama</td>
+          </tr>
+        </table>
+
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="language-bash"># Start including AI features
+docker compose --profile ai up -d</code></pre>
+        </div>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('api-ai')">
+            <span class="dir">← Previous</span><span class="label">AI API</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('deploy-env')">
+            <span class="dir">Next →</span><span class="label">Environment Variables</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     ENVIRONMENT VARIABLES
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-deploy-env" data-title="Environment Variables" data-section="Deployment">
+        <div class="breadcrumb"><span>Docs</span> › <span>Deployment</span> › Environment Variables</div>
+        <h1>Environment Variables</h1>
+
+        <h2>Full reference</h2>
+        <table>
+          <tr>
+            <th>Variable</th>
+            <th>Service</th>
+            <th>Default</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td><code>POSTGRES_PASSWORD</code></td>
+            <td>All</td>
+            <td><code>odin</code></td>
+            <td>PostgreSQL password (shared)</td>
+          </tr>
+          <tr>
+            <td><code>KEYCLOAK_ADMIN</code></td>
+            <td>identity</td>
+            <td><code>admin</code></td>
+            <td>Keycloak admin username</td>
+          </tr>
+          <tr>
+            <td><code>KEYCLOAK_ADMIN_PASSWORD</code></td>
+            <td>identity</td>
+            <td><code>admin</code></td>
+            <td>Keycloak admin password</td>
+          </tr>
+          <tr>
+            <td><code>JWT_SECRET</code></td>
+            <td>All</td>
+            <td>—</td>
+            <td>HS256 signing secret for dev API keys</td>
+          </tr>
+          <tr>
+            <td><code>MINIO_ROOT_USER</code></td>
+            <td>harvest</td>
+            <td><code>minio</code></td>
+            <td>MinIO access key</td>
+          </tr>
+          <tr>
+            <td><code>MINIO_ROOT_PASSWORD</code></td>
+            <td>harvest</td>
+            <td><code>minio123</code></td>
+            <td>MinIO secret key</td>
+          </tr>
+          <tr>
+            <td><code>OPENSEARCH_PASSWORD</code></td>
+            <td>search</td>
+            <td><code>admin</code></td>
+            <td>OpenSearch admin password</td>
+          </tr>
+          <tr>
+            <td><code>OLLAMA_BASE_URL</code></td>
+            <td>ai</td>
+            <td><code>http://ollama:11434</code></td>
+            <td>Ollama base URL</td>
+          </tr>
+          <tr>
+            <td><code>OPENAI_API_KEY</code></td>
+            <td>ai</td>
+            <td>(empty)</td>
+            <td>OpenAI key; takes precedence over Ollama if set</td>
+          </tr>
+          <tr>
+            <td><code>AI_CHAT_MODEL</code></td>
+            <td>ai</td>
+            <td><code>llama3</code></td>
+            <td>Chat model name</td>
+          </tr>
+          <tr>
+            <td><code>AI_EMBED_MODEL</code></td>
+            <td>ai</td>
+            <td><code>nomic-embed-text</code></td>
+            <td>Embedding model (must be 768-dim)</td>
+          </tr>
+          <tr>
+            <td><code>SNOWFLAKE_ACCOUNT</code></td>
+            <td>harvest</td>
+            <td>—</td>
+            <td>Snowflake account identifier</td>
+          </tr>
+          <tr>
+            <td><code>AWS_ACCESS_KEY_ID</code></td>
+            <td>harvest</td>
+            <td>—</td>
+            <td>AWS credentials for Glue connector</td>
+          </tr>
+          <tr>
+            <td><code>AWS_SECRET_ACCESS_KEY</code></td>
+            <td>harvest</td>
+            <td>—</td>
+            <td>AWS credentials for Glue connector</td>
+          </tr>
+          <tr>
+            <td><code>AWS_REGION</code></td>
+            <td>harvest</td>
+            <td><code>us-east-1</code></td>
+            <td>AWS region for Glue</td>
+          </tr>
+        </table>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('deploy-compose')">
+            <span class="dir">← Previous</span><span class="label">Docker Compose</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('deploy-k8s')">
+            <span class="dir">Next →</span><span class="label">Kubernetes (Helm)</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     KUBERNETES
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-deploy-k8s" data-title="Kubernetes (Helm)" data-section="Deployment">
+        <div class="breadcrumb"><span>Docs</span> › <span>Deployment</span> › Kubernetes (Helm)</div>
+        <h1>Kubernetes (Helm)</h1>
+        <p>Helm charts are provided under <code>infra/helm/charts/</code> for each service. A top-level umbrella chart
+          is planned for GA.</p>
+
+        <div class="callout warn">
+          <span class="callout-icon">⚠</span>
+          <div>Kubernetes deployment is in early stages. The Helm charts are functional but not hardened for production.
+            Use Docker Compose for evaluation and development.</div>
+        </div>
+
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="language-bash"># Install catalog-service chart
+helm install odin-catalog infra/helm/charts/catalog-service \
+  --namespace odin --create-namespace \
+  --set postgresql.password=changeme \
+  --set kafka.brokers=kafka:9092</code></pre>
+        </div>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('deploy-env')">
+            <span class="dir">← Previous</span><span class="label">Environment Variables</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('contrib-dev')">
+            <span class="dir">Next →</span><span class="label">Local Development</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     LOCAL DEVELOPMENT
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-contrib-dev" data-title="Local Development" data-section="Contributing">
+        <div class="breadcrumb"><span>Docs</span> › <span>Contributing</span> › Local Development</div>
+        <h1>Local Development</h1>
+
+        <h2>Build all services</h2>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="language-bash">./gradlew build               # compile + test all services
+./gradlew :services:catalog-service:bootRun  # run one service</code></pre>
+        </div>
+
+        <h2>Build the frontends</h2>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="language-bash">cd frontend/shared && pnpm install && pnpm build
+cd ../producer  && pnpm install && pnpm dev   # http://localhost:3000
+cd ../consumer  && pnpm install && pnpm dev   # http://localhost:3001</code></pre>
+        </div>
+
+        <h2>Rebuild a single Docker image</h2>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="language-bash"># Always build then up — `restart` reuses the old image
+docker compose build catalog-service
+docker compose up -d catalog-service</code></pre>
+        </div>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('deploy-k8s')">
+            <span class="dir">← Previous</span><span class="label">Kubernetes (Helm)</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('contrib-guide')">
+            <span class="dir">Next →</span><span class="label">Contribution Guide</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     CONTRIBUTION GUIDE
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-contrib-guide" data-title="Contribution Guide" data-section="Contributing">
+        <div class="breadcrumb"><span>Docs</span> › <span>Contributing</span> › Contribution Guide</div>
+        <h1>Contribution Guide</h1>
+
+        <h2>Before you start</h2>
+        <ul>
+          <li>Open an issue describing the bug or feature before submitting a PR.</li>
+          <li>One logical change per PR — keep diffs reviewable.</li>
+          <li>All new API endpoints need an integration test that runs against a real database (no mocks).</li>
+        </ul>
+
+        <h2>Code conventions</h2>
+        <ul>
+          <li>Java: hexagonal architecture — domain classes have no Spring annotations; all infrastructure concerns live
+            in the <code>infrastructure/</code> package.</li>
+          <li>TypeScript: no <code>any</code>; shared API types live in <code>frontend/shared/src/types/</code>.</li>
+          <li>SQL: all schema changes via numbered Flyway migrations (<code>V{n}__description.sql</code>).</li>
+        </ul>
+
+        <h2>License</h2>
+        <p>ODIN Catalog is released under the <strong>Apache 2.0 License</strong>. By contributing you agree your
+          changes will be licensed under the same terms.</p>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('contrib-dev')">
+            <span class="dir">← Previous</span><span class="label">Local Development</span>
+          </a>
+          <div></div>
+        </div>
+      </article>
+
+    </main>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+  <script>
+    const pageOrder = [
+      'intro', 'quickstart', 'prereqs', 'config',
+      'arch-overview', 'arch-services', 'arch-events', 'arch-security',
+      'model-overview', 'model-dcat', 'model-dprod', 'model-csvw', 'model-logical', 'model-vocab', 'model-lineage',
+      'svc-catalog', 'svc-harvest', 'svc-lineage', 'svc-search', 'svc-ai', 'svc-identity',
+      'api-auth', 'api-catalog', 'api-harvest', 'api-lineage', 'api-search', 'api-ai',
+      'deploy-compose', 'deploy-env', 'deploy-k8s',
+      'contrib-dev', 'contrib-guide'
+    ];
+
+    function show(id) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-link').forEach(a => a.classList.remove('active'));
+      const page = document.getElementById('page-' + id);
+      if (page) page.classList.add('active');
+      const link = document.querySelector(`.nav-link[onclick="show('${id}')"]`);
+      if (link) {
+        link.classList.add('active');
+        link.scrollIntoView({ block: 'nearest' });
+      }
+      window.scrollTo(0, 0);
+      history.replaceState(null, '', '#' + id);
+      if (window.innerWidth < 768) document.getElementById('sidebar').classList.remove('open');
+    }
+
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('open');
+    }
+
+    function copyCode(btn) {
+      const code = btn.closest('.code-block').querySelector('code');
+      navigator.clipboard.writeText(code.innerText).then(() => {
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 1500);
+      });
+    }
+
+    // Search
+    const searchIndex = [];
+    document.querySelectorAll('.page').forEach(page => {
+      searchIndex.push({
+        id: page.id.replace('page-', ''),
+        title: page.dataset.title,
+        section: page.dataset.section,
+        text: page.innerText.toLowerCase()
+      });
+    });
+
+    const searchInput = document.getElementById('searchInput');
+    const searchResults = document.getElementById('searchResults');
+
+    searchInput.addEventListener('input', () => {
+      const q = searchInput.value.trim().toLowerCase();
+      if (!q) { searchResults.style.display = 'none'; return; }
+      const matches = searchIndex.filter(p => p.text.includes(q) || p.title.toLowerCase().includes(q)).slice(0, 6);
+      if (!matches.length) { searchResults.style.display = 'none'; return; }
+      searchResults.innerHTML = matches.map(m => `
+      <div class="search-result-item" onclick="show('${m.id}');searchInput.value='';searchResults.style.display='none'">
+        <div class="sr-title">${m.title}</div>
+        <div class="sr-section">${m.section}</div>
+      </div>`).join('');
+      searchResults.style.display = 'block';
+    });
+
+    document.addEventListener('click', e => {
+      if (!searchResults.contains(e.target) && e.target !== searchInput) searchResults.style.display = 'none';
+    });
+
+    document.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); searchInput.focus(); }
+      if (e.key === 'Escape') { searchResults.style.display = 'none'; searchInput.blur(); }
+    });
+
+    // Load from hash
+    const hash = location.hash.slice(1);
+    if (hash && pageOrder.includes(hash)) show(hash);
+  </script>
+</body>
+
+</html>
