@@ -27,9 +27,11 @@
   - [CSV-W Physical Schema](#csv-w-physical-schema)
   - [Logical Models](#logical-models)
   - [Vocabulary & FIBO](#vocabulary--fibo)
+  - [Vocabulary & AI](#vocabulary--ai)
   - [OpenLineage](#openlineage)
+- [Database ERDs](erd.md) — full schema diagrams for all five databases
 - [Services](#services-1)
-  - [Catalog Service](#catalog-service)
+  - [Catalog Service](#inventory-service)
   - [Harvest Service](#harvest-service)
   - [Lineage Service](#lineage-service)
   - [Search Service](#search-service)
@@ -219,7 +221,7 @@ Traefik (port 80/443)
     ├── manage.catalog.local/   → producer-frontend (nginx, port 3000)
     └── api.catalog.local/      → services (ports 8001–8006)
             │
-            ├── catalog-service  :8001  PostgreSQL :5433
+            ├── inventory-service  :8001  PostgreSQL :5433
             ├── harvest-service  :8002  PostgreSQL :5434 + MinIO :9000
             ├── lineage-service  :8003  PostgreSQL+AGE :5435
             ├── search-service   :8004  OpenSearch :9200
@@ -242,7 +244,7 @@ Traefik (port 80/443)
 
 | Service | Port | Database | Responsibility |
 |---|---|---|---|
-| **catalog-service** | 8001 | PostgreSQL 16 | DCAT/DPROD/CSV-W metadata, logical models, vocabulary mappings, Kafka event publisher |
+| **inventory-service** | 8001 | PostgreSQL 16 | DCAT/DPROD/CSV-W metadata, logical models, vocabulary mappings, Kafka event publisher |
 | **harvest-service** | 8002 | PostgreSQL 16 + MinIO | Spring Batch crawlers for Snowflake, AWS Glue, Teradata, DCAT HTTP; Quartz scheduler |
 | **lineage-service** | 8003 | PostgreSQL + Apache AGE | OpenLineage REST ingestion, DDL parsing via Calcite, Cypher graph queries |
 | **search-service** | 8004 | OpenSearch 2.x | Full-text + semantic indexing, FIBO facets, autocomplete suggestions |
@@ -257,9 +259,9 @@ All inter-service communication uses Kafka with an envelope schema that carries 
 
 | Topic | Producer | Consumers | Compacted |
 |---|---|---|---|
-| `catalog.datasets.changes` | catalog-service | search-service, ai-service | Yes |
-| `catalog.data-products.changes` | catalog-service | search-service, ai-service | Yes |
-| `harvest.entities.discovered` | harvest-service | catalog-service | No |
+| `inventory.datasets.changes` | inventory-service | search-service, ai-service | Yes |
+| `inventory.data-products.changes` | inventory-service | search-service, ai-service | Yes |
+| `harvest.entities.discovered` | harvest-service | inventory-service | No |
 | `harvest.ddl.discovered` | harvest-service | lineage-service | No |
 | `lineage.graph.updated` | lineage-service | search-service | No |
 
@@ -270,7 +272,7 @@ All inter-service communication uses Kafka with an envelope schema that carries 
   "eventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "eventType": "DatasetCreated",
   "schemaVersion": "1.0",
-  "producerService": "catalog-service",
+  "producerService": "inventory-service",
   "tenantId": "00000000-0000-0000-0000-000000000001",
   "timestamp": "2026-05-18T10:23:00Z",
   "payload": { }
@@ -310,11 +312,10 @@ Logical      Dataset (DCAT)
                ├── VocabularyProfile → Vocabulary (FIBO / schema.org)
                └── LogicalModel
                      └── LogicalDataElement
-                           ├── physicalColumnId ──FK──┐
-                           └── VocabularyMapping      │ (SKOS)
-                                                      │
-Physical     Distribution (DCAT)                      │
-               └── CSVWTable → CSVWSchema → CSVWColumn ◄┘
+                           └── VocabularyMapping (SKOS)
+                                   ▲
+Physical     Distribution (DCAT)  │ logicalDataElementId FK
+               └── CSVWTable → CSVWSchema → CSVWColumn ──────────────┘
 
 Lineage      OpenLineage Job ─[READS_FROM/WRITES_TO]→ Dataset
              (stored in Apache AGE graph, linked to DCAT Dataset)
@@ -396,7 +397,7 @@ The physical layer is modelled using [CSV on the Web (CSV-W)](https://www.w3.org
 | `description` | string | Column comment from the source DDL |
 | `propertyUrl` | URI | Linked Data property IRI if available |
 
-Physical columns are created automatically during harvest. A `physicalColumnId` UUID is assigned to each and can be referenced from a `LogicalDataElement` to create the logical–physical binding.
+Physical columns are created automatically during harvest. Each `CSVWColumn` carries an optional `logicalDataElementId` FK that, when set, creates the logical–physical binding. A single `LogicalDataElement` may be bound by multiple physical columns across different distributions or schema versions.
 
 ---
 
@@ -408,7 +409,7 @@ A **LogicalModel** belongs to a Dataset and provides the business-oriented view 
 |---|---|---|
 | `name` | string | Business name: *Trade Amount*, *Settlement Currency* |
 | `logicalType` | string | Semantic type: `MonetaryAmount`, `Identifier`, `Date`, `Party` |
-| `physicalColumnId` | UUID (nullable) | FK to harvested `csvw_columns` row; null until harvest or manual bind |
+| `physicalColumnIds` | UUID[] | IDs of bound `csvw_columns` rows (FK lives on the column side) |
 | `isIdentifier` | boolean | True if this element forms part of the logical primary key |
 | `isNullable` | boolean | Whether the business concept permits absence of a value |
 
@@ -422,7 +423,7 @@ curl -X POST \
   -d '{ "physicalColumnId": "b3f1a2e4-..." }'
 ```
 
-**Auto-scaffold from harvest:** When a harvest run discovers columns for a dataset that has no published LogicalModel, ODIN automatically generates a *draft* LogicalModel with one `LogicalDataElement` per `CSVWColumn`. Each element has its `physicalColumnId` pre-bound and its `logicalType` inferred from the source datatype.
+**Auto-scaffold from harvest:** When a harvest run discovers columns for a dataset that has no published LogicalModel, ODIN automatically generates a *draft* LogicalModel with one `LogicalDataElement` per `CSVWColumn`. Each harvested column has its `logicalDataElementId` set to the newly created element, and its `logicalType` is inferred from the source datatype.
 
 ---
 
@@ -464,6 +465,38 @@ curl -X POST \
     "conceptLabel": "MonetaryAmount",
     "matchType": "exactMatch"
   }'
+```
+
+---
+
+### Vocabulary & AI
+
+Semantic vocabularies are the missing layer between your data and AI. Standard concept IRIs — schema.org and FIBO — transform how language models reason over catalog metadata.
+
+**Ambiguity is the root cause of AI failure.** RAG pipelines retrieve chunks of text. Without semantic grounding, a question about "settlement amount" returns every table that mentions the word "amount." A SKOS `exactMatch` binding to `fibo-fnd-acc-cur:MonetaryAmount` makes retrieval precise — the model finds the right element, not the most popular one.
+
+**Standard IRIs are native to foundation models.** schema.org and FIBO IRIs appear extensively in the training corpora of every major LLM. Annotating a data element with `https://schema.org/price` or `fibo-md-temx-ex:MarketPrice` puts it in semantic proximity to everything the model already knows about that concept — zero prompt engineering required.
+
+**Agents need contracts, not descriptions.** A vocabulary mapping is a contract: this column contains a `LegalEntityIdentifier`, not "some kind of ID." Agents that operate on contracts are auditable; agents that operate on descriptions are not.
+
+**Your metadata becomes a knowledge graph.** ODIN's vocabulary mappings, logical models, and lineage edges form a traversable knowledge graph stored in Apache AGE. From a regulatory report, upstream through lineage to source systems, sideways through vocabulary to equivalent concepts in other datasets.
+
+**FIBO: regulatory-grade semantics, pre-loaded.**
+
+| FIBO concept IRI (abbreviated) | Meaning |
+|---|---|
+| `fibo-fnd-acc-cur:MonetaryAmount` | Monetary value with attached currency |
+| `fibo-fnd-acc-cur:Currency` | ISO 4217 currency code |
+| `fibo-fbc-fi-fi:FinancialInstrument` | General financial instrument |
+| `fibo-fbc-fct-rga:LegalEntityIdentifier` | LEI — unique legal entity identifier |
+| `fibo-md-temx-ex:MarketPrice` | Exchange-quoted market price |
+| `fibo-sec-eq-eq:Share` | Equity share / stock |
+
+**Cross-system equivalence without ETL.** Different source systems use different column names for the same concept: `trade_ccy`, `SETTL_CURR`, `SettlementCurrency`. All three mapped to `fibo-fnd-acc-cur:Currency` with `exactMatch` become interchangeable to any AI agent — without moving a byte of data. Find all matching datasets via the search API:
+
+```bash
+curl "http://localhost:8004/api/v1/search?fibo_concept=fibo-fnd-acc-cur%3ACurrency" \
+  -H "X-API-Key: dev-local"
 ```
 
 ---
@@ -512,7 +545,7 @@ Lineage is stored in an Apache AGE property graph on PostgreSQL. Cypher queries 
 
 **Port:** 8001 | **Database:** PostgreSQL 16 (port 5433)
 
-The catalog-service is the primary metadata store. It owns all DCAT, DPROD, CSV-W, logical model, and vocabulary resources. All other services treat it as the source of truth.
+The inventory-service is the primary metadata store. It owns all DCAT, DPROD, CSV-W, logical model, and vocabulary resources. All other services treat it as the source of truth.
 
 **Responsibilities:**
 - Persist and version DCAT Datasets, Distributions, DataServices, Catalogs
@@ -531,7 +564,7 @@ The catalog-service is the primary metadata store. It owns all DCAT, DPROD, CSV-
 
 **Port:** 8002 | **Database:** PostgreSQL 16 (port 5434) + MinIO
 
-The harvest-service crawls external data sources, normalises their metadata, and publishes it to Kafka for the catalog-service to ingest. Jobs are scheduled with Quartz and executed as Spring Batch jobs.
+The harvest-service crawls external data sources, normalises their metadata, and publishes it to Kafka for the inventory-service to ingest. Jobs are scheduled with Quartz and executed as Spring Batch jobs.
 
 **Supported connectors:**
 
@@ -630,7 +663,7 @@ curl -N -X POST http://localhost:8005/api/v1/conversations/$CONV/messages \
   -d '{"content": "Which datasets contain monetary amounts mapped to FIBO?"}'
 ```
 
-**Embedding pipeline:** The ai-service listens on `catalog.datasets.changes` and `catalog.data-products.changes`. On each event it fetches the enriched entity from catalog-service, chunks the text (title + description + element names + vocabulary labels), embeds the chunks using the configured model, and upserts into the pgvector store.
+**Embedding pipeline:** The ai-service listens on `inventory.datasets.changes` and `inventory.data-products.changes`. On each event it fetches the enriched entity from inventory-service, chunks the text (title + description + element names + vocabulary labels), embeds the chunks using the configured model, and upserts into the pgvector store.
 
 ---
 
@@ -749,7 +782,7 @@ curl -H "X-API-Key: dev-local" ...
 | `GET` | `/api/v1/search` | Full-text search. Params: `q`, `type`, `domain`, `lifecycleStatus`, `format`, `hasLineage`, `fibo_concept`, `page`, `size` |
 | `GET` | `/api/v1/search/suggest` | Autocomplete. Param: `q`. Returns up to 10 suggestions |
 | `POST` | `/api/v1/search/saved` | Save a search query |
-| `POST` | `/api/v1/admin/reindex` | Trigger full reindex from catalog-service |
+| `POST` | `/api/v1/admin/reindex` | Trigger full reindex from inventory-service |
 
 ---
 
@@ -785,7 +818,7 @@ The repository ships a `docker-compose.yml` for the full stack and a `docker-com
 | `make reindex` | Full OpenSearch reindex |
 | `make build` | Build all Docker images from source |
 | `make test` | Run all service tests in Docker |
-| `make logs svc=catalog-service` | Tail logs for a specific service |
+| `make logs svc=inventory-service` | Tail logs for a specific service |
 
 **Profiles:**
 
@@ -803,8 +836,8 @@ docker compose --profile ai up -d
 
 ```bash
 # Always build then up — `restart` reuses the old image
-docker compose build catalog-service
-docker compose up -d catalog-service
+docker compose build inventory-service
+docker compose up -d inventory-service
 ```
 
 ---
@@ -838,7 +871,7 @@ Helm charts are provided under `infra/helm/charts/` for each service. A top-leve
 > **Warning:** Kubernetes deployment is in early stages. The Helm charts are functional but not hardened for production. Use Docker Compose for evaluation and development.
 
 ```bash
-helm install odin-catalog infra/helm/charts/catalog-service \
+helm install odin-catalog infra/helm/charts/inventory-service \
   --namespace odin --create-namespace \
   --set postgresql.password=changeme \
   --set kafka.brokers=kafka:9092
@@ -854,7 +887,7 @@ helm install odin-catalog infra/helm/charts/catalog-service \
 
 ```bash
 ./gradlew build                              # compile + test all services
-./gradlew :services:catalog-service:bootRun  # run one service locally
+./gradlew :services:inventory-service:bootRun  # run one service locally
 ```
 
 **Build the frontends:**
