@@ -28,18 +28,25 @@
   - [Logical Models](#logical-models)
   - [Vocabulary & FIBO](#vocabulary--fibo)
   - [Vocabulary & AI](#vocabulary--ai)
+  - [Terms of Use (ODRL)](#terms-of-use-odrl)
   - [OpenLineage](#openlineage)
+- [Capabilities Matrix](capabilities.md) — full feature inventory with status (available / partial / planned)
 - [Database ERDs](erd.md) — full schema diagrams for all five databases
 - [Services](#services-1)
-  - [Catalog Service](#inventory-service)
+  - [Inventory Service](#inventory-service)
   - [Harvest Service](#harvest-service)
   - [Lineage Service](#lineage-service)
   - [Search Service](#search-service)
   - [AI Service](#ai-service)
   - [Identity Service](#identity-service)
+- [Authentication & User Management](#authentication--user-management)
+  - [Roles](#roles)
+  - [Default Users](#default-users)
+  - [Inviting Users](#inviting-users)
+  - [Keycloak Configuration](#keycloak-configuration)
 - [API Reference](#api-reference)
   - [Authentication](#authentication)
-  - [Catalog API](#catalog-api)
+  - [Inventory API](#inventory-api)
   - [Harvest API](#harvest-api)
   - [Lineage API](#lineage-api)
   - [Search API](#search-api)
@@ -47,7 +54,9 @@
 - [Deployment](#deployment)
   - [Docker Compose](#docker-compose)
   - [Environment Variables](#environment-variables)
-  - [Kubernetes (Helm)](#kubernetes-helm)
+  - [Kubernetes (Raw Manifests)](#kubernetes-raw-manifests)
+  - [Kubernetes (Helm / MicroK8s)](#kubernetes-helm--microk8s)
+- [Security Hardening](#security-hardening)
 - [Contributing](#contributing)
   - [Local Development](#local-development)
   - [Contribution Guide](#contribution-guide)
@@ -66,6 +75,9 @@ ODIN Catalog is an open-source data catalog built on W3C and OMG standards. It b
 - **Live lineage graph** — OpenLineage events and SQL DDL are parsed into an Apache AGE property graph queryable by Cypher.
 - **Data product governance** — the DPROD standard gives every dataset a business owner, lifecycle stage, and access policy.
 - **AI-powered Q&A** — a Spring AI RAG pipeline runs over your metadata corpus using Ollama (local) or OpenAI.
+- **AI metadata enrichment** — per-element classification, description, and vocabulary concept recommendations, all owner-reviewed before acceptance.
+- **ODRL terms of use** — access-level policy (OPEN → HIGHLY\_RESTRICTED) derived automatically from element classifications and vocabulary concepts; displayed to consumers, governed by data owners.
+- **Accountable data ownership** — role-based dataset ownership with a proposal-and-approval transfer workflow and a full audit history. The governance dashboard surfaces pending tasks and an activity feed for every user.
 - **Zero lock-in** — all metadata is exportable as DCAT 3.0 JSON-LD.
 
 **Standards at the core:**
@@ -78,6 +90,7 @@ ODIN Catalog is an open-source data catalog built on W3C and OMG standards. It b
 | **OpenLineage** | Linux Foundation | Job/Run/Dataset lineage events ingested via REST |
 | **FIBO** | EDM Council | Pre-loaded financial ontology vocabulary (FND, FBC, SEC, MD) |
 | **SKOS** | W3C | Mapping properties: exactMatch, closeMatch, relatedMatch |
+| **ODRL** | W3C | Terms of use policies — permissions, prohibitions, obligations derived from element classifications and vocabulary concepts |
 
 > **Alpha notice:** ODIN is currently in private alpha. APIs and database schemas may change between releases. Not recommended for production workloads yet.
 
@@ -249,7 +262,7 @@ Traefik (port 80/443)
 | **lineage-service** | 8003 | PostgreSQL + Apache AGE | OpenLineage REST ingestion, DDL parsing via Calcite, Cypher graph queries |
 | **search-service** | 8004 | OpenSearch 2.x | Full-text + semantic indexing, FIBO facets, autocomplete suggestions |
 | **ai-service** | 8005 | PostgreSQL + pgvector | Spring AI RAG pipeline, embeddings, SSE chat streaming, Ollama / OpenAI |
-| **identity-service** | 8006 | PostgreSQL 16 | Keycloak OAuth2/OIDC integration, ABAC policies, API keys, tenant management |
+| **identity-service** | 8006 | PostgreSQL 16 | Keycloak OAuth2/OIDC, role-based access (Administrator, Data Owner, Steward, Governance), user provisioning with Keycloak sync, API keys, tenant management |
 
 ---
 
@@ -287,13 +300,15 @@ All inter-service communication uses Kafka with an envelope schema that carries 
 
 | Method | Header | Use case |
 |---|---|---|
-| Bearer JWT (OIDC) | `Authorization: Bearer <token>` | User sessions via Keycloak |
-| API Key | `X-API-Key: <key>` | Service-to-service, CI pipelines, curl |
+| Bearer JWT (OIDC) | `Authorization: Bearer <token>` | User sessions via Keycloak (producer UI, consumer UI) |
+| API Key | `X-API-Key: <key>` | Service-to-service calls, CI pipelines, curl |
 | Dev key | `X-API-Key: dev-*` | Local development only — bypasses auth entirely |
 
-**Tenant isolation:** Every resource row carries a `tenant_id` UUID. The `X-Tenant-Id` header (set by Traefik or the frontend nginx) scopes all queries. Rows from other tenants are never returned.
+**Tenant isolation:** Every resource row carries a `tenant_id` UUID extracted from the JWT `tenant_id` claim. Rows from other tenants are never returned. The `X-Tenant-Id` header is no longer injected by nginx — the tenant is carried in the JWT itself.
 
 > **Critical:** Never use `X-API-Key: dev-*` in production. It grants unrestricted admin access to all tenants.
+
+See the [Authentication & User Management](#authentication--user-management) section for role definitions, user setup, and Keycloak configuration.
 
 ---
 
@@ -407,8 +422,13 @@ A **LogicalModel** belongs to a Dataset and provides the business-oriented view 
 
 | Field | Type | Description |
 |---|---|---|
-| `name` | string | Business name: *Trade Amount*, *Settlement Currency* |
+| `name` | string | Technical element name (from harvest or manual entry) |
+| `label` | string | Human-readable business name shown in the Model tab: *Trade Amount*, *Settlement Currency* |
+| `description` | string | Plain-English business description, curated by a steward or accepted from an AI recommendation |
 | `logicalType` | string | Semantic type: `MonetaryAmount`, `Identifier`, `Date`, `Party` |
+| `classification` | string | Accepted data sensitivity level: `PUBLIC`, `INTERNAL`, `CONFIDENTIAL`, `HIGH_CONFIDENTIAL` |
+| `recommendedClassification` | string | AI-suggested classification pending data owner review; cleared on accept/reject |
+| `classificationReasoning` | string | One-sentence rationale produced alongside the AI classification recommendation |
 | `physicalColumnIds` | UUID[] | IDs of bound `csvw_columns` rows (FK lives on the column side) |
 | `isIdentifier` | boolean | True if this element forms part of the logical primary key |
 | `isNullable` | boolean | Whether the business concept permits absence of a value |
@@ -421,6 +441,25 @@ curl -X POST \
   -H "Content-Type: application/json" \
   -H "X-API-Key: dev-local" \
   -d '{ "physicalColumnId": "b3f1a2e4-..." }'
+```
+
+**AI description recommendation:** For each element the AI service can generate a plain-English business description grounded in the element's name, label, logical type, and vocabulary mappings. The result is stored in `recommendedDescription` and surfaced as an inline suggestion in the Model tab — a steward accepts or dismisses it. Accepting writes the text to `description` and clears `recommendedDescription`.
+
+```bash
+# Request a description recommendation for one element
+curl -s -X POST \
+  http://localhost:8001/api/v1/logical-data-elements/{elementId}/recommend-description \
+  -H "X-API-Key: dev-local"
+
+# Accept the recommendation
+curl -s -X POST \
+  http://localhost:8001/api/v1/logical-data-elements/{elementId}/accept-description \
+  -H "X-API-Key: dev-local"
+
+# Bulk — all elements in a model
+curl -s -X POST \
+  http://localhost:8001/api/v1/logical-models/{modelId}/recommend-descriptions \
+  -H "X-API-Key: dev-local"
 ```
 
 **Auto-scaffold from harvest:** When a harvest run discovers columns for a dataset that has no published LogicalModel, ODIN automatically generates a *draft* LogicalModel with one `LogicalDataElement` per `CSVWColumn`. Each harvested column has its `logicalDataElementId` set to the newly created element, and its `logicalType` is inferred from the source datatype.
@@ -469,6 +508,43 @@ curl -X POST \
 
 ---
 
+### Semantic Types
+
+A **semantic type** is the terminal fragment of a vocabulary concept IRI, extracted automatically from `exactMatch` and `closeMatch` mappings on published logical models. Semantic types provide a lightweight, human-readable classification at the dataset level — without duplicating the raw IRI.
+
+| Vocabulary concept IRI | Semantic type |
+|---|---|
+| `.../FBC/ProductsAndServices/ClientsAndAccounts/Customer` | `Customer` |
+| `.../FBC/ProductsAndServices/ClientsAndAccounts/DebitCardAccount` | `DebitCardAccount` |
+| `https://schema.org/LoanOrCredit` | `LoanOrCredit` |
+
+The `GET /api/v1/datasets/{id}/semantic-context` endpoint returns:
+
+| Field | Description |
+|---|---|
+| `semanticTypes` | IRI fragments from exactMatch/closeMatch (published models only) |
+| `vocabConceptLabels` | All concept labels across all elements |
+| `vocabConceptIris` | All concept IRIs |
+| `fiboConcepts` | Subset of IRIs containing `edmcouncil.org/fibo` |
+| `logicalElementNames` | Business names of all logical elements |
+| `logicalTypes` | Logical type values (MonetaryAmount, Date, …) |
+| `acceptedTags` | AI-recommended semantic tags accepted and persisted by a steward |
+
+**AI recommendations:** `POST /api/v1/datasets/{id}/recommend-semantic-context` sends the full semantic context to the LLM and returns typed `RecommendedSemanticType` objects with a rationale and optional vocabulary hint. Recommendations can be accepted (persisting a `DatasetSemanticTag`) or dismissed.
+
+```bash
+# Get AI recommendations for a dataset
+curl -X POST http://localhost:8001/api/v1/datasets/{id}/recommend-semantic-context \
+  -H "X-API-Key: dev-local"
+
+# Accept a recommendation
+curl -X POST http://localhost:8001/api/v1/datasets/{id}/semantic-tags \
+  -H "Content-Type: application/json" -H "X-API-Key: dev-local" \
+  -d '{"type": "Customer", "vocabularyIri": "https://spec.edmcouncil.org/fibo/.../Customer"}'
+```
+
+---
+
 ### Vocabulary & AI
 
 Semantic vocabularies are the missing layer between your data and AI. Standard concept IRIs — schema.org and FIBO — transform how language models reason over catalog metadata.
@@ -498,6 +574,49 @@ Semantic vocabularies are the missing layer between your data and AI. Standard c
 curl "http://localhost:8004/api/v1/search?fibo_concept=fibo-fnd-acc-cur%3ACurrency" \
   -H "X-API-Key: dev-local"
 ```
+
+---
+
+### Terms of Use (ODRL)
+
+ODIN derives an [ODRL](https://www.w3.org/TR/odrl-model/) terms-of-use policy for every dataset automatically — no manual authoring required. The policy is inferred from two signals already present in the catalog:
+
+1. **Element classifications** — the most restrictive accepted `classification` across all published logical model elements determines the access level.
+2. **Vocabulary concept mappings** — FIBO namespace prefixes (`fibo-fbc`, `fibo-sec`, `fibo-md`) and dataset keywords (`mifid`, `emir`, `gdpr`, `basel`, `finrep`) identify applicable regulatory frameworks.
+
+**Access levels:**
+
+| Effective classification | Access level | Typical restrictions |
+|---|---|---|
+| `PUBLIC` | OPEN | Redistribute with attribution |
+| `INTERNAL` | INTERNAL_ONLY | No external distribution |
+| `CONFIDENTIAL` | RESTRICTED | Analytics only; notify data owner before AI/ML use |
+| `HIGH_CONFIDENTIAL` | HIGHLY_RESTRICTED | Explicit approval required; full audit trail |
+
+**Retrieve derived terms:**
+
+```bash
+curl http://localhost:8001/api/v1/datasets/{id}/terms-of-use \
+  -H "X-API-Key: dev-local"
+```
+
+The response includes `effectiveClassification`, `accessLevel`, `permissions`, `prohibitions`, `obligations`, `applicableRegulations`, `odrlPolicy` (full ODRL JSON), `policySource` (`derived` / `explicit` / `fallback`), and `derivationDetails` (element counts, matched signals).
+
+**Accept and lock a policy (data owner only):**
+
+```bash
+# Lock the derived policy as the official terms for this dataset
+curl -X POST http://localhost:8001/api/v1/datasets/{id}/terms-of-use/accept \
+  -H "X-API-Key: dev-local"
+
+# Reset back to dynamic derivation
+curl -X DELETE http://localhost:8001/api/v1/datasets/{id}/terms-of-use/policy \
+  -H "X-API-Key: dev-local"
+```
+
+**Accept pre-condition:** The "Accept Policy" button in the producer Governance tab is enabled only when every element in the published logical model has both an accepted `classification` and at least one vocabulary concept mapping. ODIN shows per-element readiness hints while conditions are unmet.
+
+**Consumer visibility:** The consumer discovery UI exposes a **Terms** tab on every dataset drawer, showing the access level badge, rule sections, applicable regulations as pills, and a collapsible ODRL JSON block for technical consumers.
 
 ---
 
@@ -539,9 +658,39 @@ Lineage is stored in an Apache AGE property graph on PostgreSQL. Cypher queries 
 
 ---
 
+### Governance & Audit
+
+Every dataset has an optional **data owner** and an immutable **audit history**. Ownership only changes hands through a proposal workflow, so a transfer is never unilateral.
+
+**Assigning an owner:** `PUT /api/v1/datasets/{id}/owner` with `{"userId":"..."}`. Rejected with `409` if the dataset already has an owner — use the transfer workflow instead.
+
+**Ownership transfer workflow:**
+1. **Propose** — `POST /api/v1/datasets/{id}/ownership-proposals` with `{"proposedOwnerId":"..."}` creates a `PENDING` proposal.
+2. **Approve / reject** — only the current owner (or a catalog admin) may call `.../ownership-proposals/{proposalId}/approve` or `.../reject`.
+3. **Pending queue** — `GET .../ownership-proposals/pending` returns the open proposal, or `204` if none.
+
+**AI action gating:** Accepting or rejecting AI-generated recommendations is restricted to the dataset's data owner:
+
+| Action | Who can perform it |
+|---|---|
+| Accept / reject AI classification | Data Owner, Administrator |
+| Accept / reject AI description | Data Owner, Administrator |
+| Accept / reject AI vocabulary concept recommendations | Data Owner, Administrator |
+| Accept / reset ODRL terms of use policy | Data Owner only |
+| Accept physical schema AI mappings | Data Owner only |
+| Approve / reject ownership transfer | Current Data Owner, Administrator |
+| Direct owner assignment (unowned dataset) | Administrator |
+| Propose ownership transfer | Data Governance Officer, Data Steward, current Data Owner |
+
+**Audit history:** `GET /api/v1/datasets/{id}/history` returns a paginated, reverse-chronological log. Tracked events: `CREATED`, `UPDATED`, `DELETED`, `OWNER_ASSIGNED`, `OWNER_TRANSFER_PROPOSED`, `OWNER_TRANSFER_APPROVED`, `OWNER_TRANSFER_REJECTED`.
+
+**Governance dashboard:** The producer UI dashboard provides a personal governance view — stat cards (owned datasets and data products), Outstanding Tasks (pending transfers directed at the user), My Proposals (proposals submitted or nominated for), and My Changes (a chronological event feed). Served by `GET /api/v1/dashboard/summary` and `GET /api/v1/dashboard/activity` on the inventory-service.
+
+---
+
 ## Services
 
-### Catalog Service
+### Inventory Service
 
 **Port:** 8001 | **Database:** PostgreSQL 16 (port 5433)
 
@@ -663,7 +812,15 @@ curl -N -X POST http://localhost:8005/api/v1/conversations/$CONV/messages \
   -d '{"content": "Which datasets contain monetary amounts mapped to FIBO?"}'
 ```
 
-**Embedding pipeline:** The ai-service listens on `inventory.datasets.changes` and `inventory.data-products.changes`. On each event it fetches the enriched entity from inventory-service, chunks the text (title + description + element names + vocabulary labels), embeds the chunks using the configured model, and upserts into the pgvector store.
+**Embedding pipeline:** The ai-service listens on `inventory.datasets.changes` and `inventory.data-products.changes`. On each event it produces three chunks per dataset:
+
+| Chunk | Content |
+|---|---|
+| 0 | Title + description + keywords + physical column names |
+| 1 | Logical element names + vocab concept labels (business meaning layer) |
+| 2 | Semantic types + vocab concept labels + logical element names (type layer — enables "which datasets contain Customer data?" queries) |
+
+All three chunks are embedded and upserted into pgvector. During RAG retrieval the top-8 chunks from the semantic similarity search are injected as catalog context into the system prompt.
 
 ---
 
@@ -673,9 +830,132 @@ curl -N -X POST http://localhost:8005/api/v1/conversations/$CONV/messages \
 
 The identity-service manages organisations, users, roles, and access policies. It integrates with Keycloak 24 for OIDC token issuance and validation.
 
-A realm export is included at `infra/keycloak/realm-export.json` and imported automatically on first startup.
+**Responsibilities:**
+- User provisioning (invite, list, enable/disable) backed by the Keycloak Admin REST API — changes made in the producer Admin › Users UI are written directly to Keycloak and synced to the local `catalog_users` table
+- Bidirectional Keycloak sync — on startup the service imports any existing Keycloak users into the local catalog database so that user references (e.g. `ownerId`) resolve correctly
+- Organisation and domain management
+- Long-lived API key issuance (stored as SHA-256 hashes)
+- JWT issuer — all services trust `http://keycloak:8180/realms/datacatalog`
+
+The Keycloak realm (`datacatalog`) is auto-imported from `infra/keycloak/datacatalog-realm.json` on first startup. Subsequent configuration changes must be applied via the Keycloak Admin Console (`http://localhost:8180`) or the Admin REST API — the import file is only read on a fresh database.
 
 > Keycloak 24 uses `KEYCLOAK_ADMIN` and `KEYCLOAK_ADMIN_PASSWORD` environment variables. The old `KC_BOOTSTRAP_ADMIN_*` variables are not supported.
+
+---
+
+## Authentication & User Management
+
+### Overview
+
+ODIN uses Keycloak 24 as its identity provider. The **producer UI** (`http://localhost:3000`) requires login before any content is shown. The **consumer UI** (`http://localhost:3001`) is read-only and does not require a login.
+
+Authentication flow:
+1. User visits the producer UI → redirected to the Keycloak login page
+2. User logs in with email and password
+3. Keycloak issues an OIDC access token (JWT) via the Authorization Code + PKCE flow
+4. The producer app stores the token in memory and includes it as a `Bearer` header on every API call
+5. Backend services validate the JWT signature against the Keycloak JWKS endpoint
+6. The token is refreshed automatically every 30 seconds before it expires
+
+---
+
+### Roles
+
+Four roles are defined in the `datacatalog` realm:
+
+| Role | Keycloak name | Description | Admin nav visible |
+|---|---|---|---|
+| **Administrator** | `administrator` | Full platform access — manages users, harvest sources, settings, all data assets | All items |
+| **Data Governance** | `data-governance` | Governs data quality and compliance across domains | Domains only |
+| **Data Owner** | `data-owner` | Owns and manages data products and datasets in their domain | Hidden |
+| **Data Steward** | `data-steward` | Curates metadata, semantic annotations, and logical models | Hidden |
+
+Each role carries a `permissions` JWT claim that controls backend API access:
+
+| Role | Backend permissions |
+|---|---|
+| Administrator | `catalog:read`, `catalog:write`, `catalog:admin` |
+| Data Governance | `catalog:read`, `catalog:write` |
+| Data Owner | `catalog:read`, `catalog:write` |
+| Data Steward | `catalog:read`, `catalog:write` |
+
+---
+
+### Default Users
+
+The following users are pre-configured in the default realm:
+
+| Email | Password | Role |
+|---|---|---|
+| `admin@datacatalog.local` | `admin` | Administrator |
+| `governance@datacatalog.local` | `password` | Data Governance |
+| `owner@datacatalog.local` | `password` | Data Owner |
+| `steward@datacatalog.local` | `password` | Data Steward |
+
+> Change all passwords before exposing the stack to a network.
+
+---
+
+### Inviting Users
+
+Users are managed through the Keycloak Admin Console. To add a new user:
+
+1. Open `http://localhost:8180` → log in as `admin` / `admin`
+2. Select the **datacatalog** realm
+3. Go to **Users** → **Add user**
+4. Set email, first name, last name; click **Create**
+5. On the **Credentials** tab set a temporary password
+6. On the **Role mapping** tab assign one of the four catalog roles
+7. On the **Attributes** tab add:
+   - Key `tenant_id` → value `00000000-0000-0000-0000-000000000001`
+   - Key `permissions` → values matching the role's permission set (see table above, one value per row)
+
+The `tenant_id` and `permissions` attributes are mapped into the JWT by Keycloak protocol mappers and are required for the backend services to accept the token.
+
+---
+
+### Keycloak Configuration
+
+**Realm:** `datacatalog`  
+**Admin console:** `http://localhost:8180`  
+**Admin credentials:** `admin` / `admin` (configured via `KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD` env vars)
+
+**Clients:**
+
+| Client ID | Type | Used by |
+|---|---|---|
+| `catalog-frontend` | Public (PKCE) | Producer and consumer browser apps |
+| `identity-service` | Confidential (service account) | Backend M2M calls to Keycloak Admin API |
+| `catalog-api` | Bearer-only | Backend resource server JWT validation |
+
+**Protocol mappers** (on `catalog-scopes` client scope):
+
+| Mapper | Claim | Purpose |
+|---|---|---|
+| `tenant_id` | `tenant_id` (String) | Tenant scoping for all backend queries |
+| `permissions` | `permissions` (JSON array) | Backend Spring Security authority grants |
+| `realm_roles` | `realm_access.roles` (String array) | Frontend role-based UI visibility |
+
+---
+
+### Logging Out
+
+Click **Sign out** in the sidebar footer of the producer UI. This terminates the Keycloak session — revisiting the app requires a fresh login.
+
+To force-expire all sessions for a user (e.g., after a role change):
+```
+Keycloak Admin Console → Users → <user> → Sessions → Sign out all sessions
+```
+
+---
+
+### Token Lifetimes
+
+| Token | Lifetime |
+|---|---|
+| Access token | 1 hour (configurable in Keycloak realm settings) |
+| Refresh token | Session-scoped (expires when browser closes) |
+| Client-side refresh | Every 30 seconds (proactive, 60 s before access token expiry) |
 
 ---
 
@@ -685,21 +965,22 @@ A realm export is included at `infra/keycloak/realm-export.json` and imported au
 
 | Header | Required | Description |
 |---|---|---|
-| `Authorization: Bearer <jwt>` | One of these two | Keycloak OIDC access token |
-| `X-API-Key: <key>` | One of these two | API key from identity-service |
-| `X-Tenant-Id: <uuid>` | Yes | Tenant scoping — set by Traefik/nginx in production |
+| `Authorization: Bearer <jwt>` | One of these two | Keycloak OIDC access token — tenant extracted from `tenant_id` JWT claim |
+| `X-API-Key: <key>` | One of these two | Long-lived API key issued by identity-service |
 
-Any key starting with `dev-` bypasses authentication and grants `catalog:admin` scope:
+When using a JWT, the `tenant_id` claim in the token provides tenant scoping automatically. No `X-Tenant-Id` header is needed.
+
+Any key starting with `dev-` bypasses authentication and grants `catalog:admin` scope for local development:
 
 ```bash
-# These are all equivalent for local development:
-curl -H "X-API-Key: dev-anything" ...
-curl -H "X-API-Key: dev-local" ...
+curl -H "X-API-Key: dev-local" http://localhost:8001/api/v1/datasets
 ```
+
+> **Do not use dev keys in production.** They grant unrestricted admin access to all tenants.
 
 ---
 
-### Catalog API
+### Inventory API
 
 **Base URL:** `http://localhost:8001`
 
@@ -721,6 +1002,26 @@ curl -H "X-API-Key: dev-local" ...
 | `POST` | `/api/v1/data-products` | Create a data product |
 | `PATCH` | `/api/v1/data-products/{id}/lifecycle` | Transition lifecycle: `{"status":"Deploy"}` |
 
+**Semantic Types & Tags**
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/v1/datasets/{id}/semantic-context` | Dataset-level semantic summary: types, vocab concepts, accepted AI tags |
+| `POST` | `/api/v1/datasets/{id}/semantic-tags` | Persist an accepted AI-recommended semantic tag |
+| `DELETE` | `/api/v1/datasets/{id}/semantic-tags/{tagId}` | Remove a persisted semantic tag |
+| `POST` | `/api/v1/datasets/{id}/recommend-semantic-context` | AI recommendation of semantic types for this dataset |
+
+**Ownership & Governance**
+
+| Method | Path | Description |
+|---|---|---|
+| `PUT` | `/api/v1/datasets/{id}/owner` | Assign an owner directly (`{userId}`) |
+| `GET` | `/api/v1/datasets/{id}/history` | Paginated audit history for a dataset |
+| `POST` | `/api/v1/datasets/{id}/ownership-proposals` | Propose an ownership transfer |
+| `POST` | `/api/v1/datasets/{id}/ownership-proposals/{proposalId}/approve` | Approve a pending transfer |
+| `POST` | `/api/v1/datasets/{id}/ownership-proposals/{proposalId}/reject` | Reject a pending transfer |
+| `GET` | `/api/v1/datasets/{id}/ownership-proposals/pending` | Fetch the current pending proposal |
+
 **Logical Models**
 
 | Method | Path | Description |
@@ -730,6 +1031,27 @@ curl -H "X-API-Key: dev-local" ...
 | `GET` | `/api/v1/logical-models/{id}/elements` | List data elements |
 | `POST` | `/api/v1/logical-data-elements/{id}/bind` | Bind element to a physical column |
 | `POST` | `/api/v1/logical-data-elements/{id}/vocab-mappings` | Add a SKOS vocabulary mapping |
+| `POST` | `/api/v1/logical-data-elements/{id}/recommend-classification` | AI-recommended data classification (PUBLIC / INTERNAL / CONFIDENTIAL / HIGH_CONFIDENTIAL) |
+| `POST` | `/api/v1/logical-data-elements/{id}/accept-classification` | Accept the pending recommended classification |
+| `POST` | `/api/v1/logical-data-elements/{id}/reject-classification` | Reject the pending recommended classification |
+| `POST` | `/api/v1/logical-data-elements/{id}/recommend-description` | AI-generated element description |
+| `POST` | `/api/v1/logical-data-elements/{id}/accept-description` | Accept the pending description |
+| `POST` | `/api/v1/logical-data-elements/{id}/reject-description` | Reject the pending description |
+| `POST` | `/api/v1/logical-models/{id}/recommend-classifications` | Bulk classification recommendation job for all elements in a model |
+| `GET` | `/api/v1/logical-models/recommend-classifications/jobs/{jobId}` | Poll bulk classification job status |
+| `POST` | `/api/v1/logical-data-elements/{id}/recommend-vocab-concepts` | AI-suggested SKOS concept mappings (up to 5) for an element |
+| `POST` | `/api/v1/logical-data-elements/{id}/accept-vocab-concepts` | Accept recommendations — creates VocabMapping rows |
+| `POST` | `/api/v1/logical-data-elements/{id}/reject-vocab-concepts` | Reject recommendations without creating mappings |
+| `POST` | `/api/v1/logical-models/{id}/recommend-vocab-concepts` | Bulk vocabulary concept recommendation job |
+| `GET` | `/api/v1/logical-models/recommend-vocab-concepts/jobs/{jobId}` | Poll bulk vocab recommendation job status |
+
+**Terms of Use (ODRL)**
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/v1/datasets/{id}/terms-of-use` | Derive ODRL policy from element classifications + vocabulary concepts |
+| `POST` | `/api/v1/datasets/{id}/terms-of-use/accept` | Lock derived policy as `hasPolicy` on the dataset |
+| `DELETE` | `/api/v1/datasets/{id}/terms-of-use/policy` | Clear explicit policy; revert to dynamic derivation |
 
 **Vocabularies**
 
@@ -779,10 +1101,11 @@ curl -H "X-API-Key: dev-local" ...
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/api/v1/search` | Full-text search. Params: `q`, `type`, `domain`, `lifecycleStatus`, `format`, `hasLineage`, `fibo_concept`, `page`, `size` |
+| `GET` | `/api/v1/search` | Full-text search. Params: `q`, `type`, `domainId`, `lifecycleStatus`, `format`, `hasLineage`, `keyword`, `theme`, `vocabConcept`, `vocab`, `semanticType`, `page`, `size` |
 | `GET` | `/api/v1/search/suggest` | Autocomplete. Param: `q`. Returns up to 10 suggestions |
-| `POST` | `/api/v1/search/saved` | Save a search query |
 | `POST` | `/api/v1/admin/reindex` | Trigger full reindex from inventory-service |
+
+The `semanticType` parameter filters by IRI terminal fragment (e.g. `?semanticType=Customer`). The search response includes a `semanticTypes` facet alongside the existing type/domain/format facets.
 
 ---
 
@@ -794,9 +1117,11 @@ curl -H "X-API-Key: dev-local" ...
 |---|---|---|
 | `GET` | `/api/v1/conversations` | List conversations for the current user |
 | `POST` | `/api/v1/conversations` | Create a new conversation |
-| `POST` | `/api/v1/conversations/{id}/messages` | Send a message. Set `Accept: text/event-stream` for SSE |
+| `POST` | `/api/v1/conversations/{id}/messages` | Send a message. Set `Accept: text/event-stream` for SSE. Optional `focusDatasetId` body field pins context to a specific dataset |
 | `POST` | `/api/v1/semantic-search` | Vector similarity search |
 | `POST` | `/api/v1/admin/embeddings/refresh` | Re-embed all documents |
+
+> **Reasoning model support:** When using qwen3 or other reasoning models, `<think>...</think>` blocks are stripped server-side before tokens are delivered to the client. The thinking phase is invisible to the SSE consumer.
 
 ---
 
@@ -864,18 +1189,167 @@ docker compose up -d inventory-service
 
 ---
 
-### Kubernetes (Helm)
+### Kubernetes (Raw Manifests)
 
-Helm charts are provided under `infra/helm/charts/` for each service. A top-level umbrella chart is planned for GA.
+Raw Kubernetes manifests live under `infra/kubernetes/`. Fourteen numbered YAML files cover everything from namespace creation to ingress rules. `deploy.sh` applies them in dependency order via `kubectl` and `envsubst`.
 
-> **Warning:** Kubernetes deployment is in early stages. The Helm charts are functional but not hardened for production. Use Docker Compose for evaluation and development.
+**Prerequisites**
+
+| Tool | Purpose |
+|---|---|
+| `kubectl` | Cluster access (configured kubeconfig) |
+| `envsubst` | Image registry injection — `apt install gettext-base` |
+| `curl`, `jq` | Health checks and seed script |
+| NGINX Ingress | `microk8s enable ingress` or install via manifest |
+
+**1. Build and push images**
 
 ```bash
-helm install odin-catalog infra/helm/charts/inventory-service \
-  --namespace odin --create-namespace \
-  --set postgresql.password=changeme \
-  --set kafka.brokers=kafka:9092
+export IMAGE_REGISTRY=localhost:32000/   # MicroK8s built-in registry
+
+for svc in inventory-service harvest-service lineage-service search-service ai-service identity-service; do
+  docker build -t ${IMAGE_REGISTRY}odin/${svc}:latest services/${svc}/
+  docker push ${IMAGE_REGISTRY}odin/${svc}:latest
+done
 ```
+
+**2. Deploy**
+
+```bash
+IMAGE_REGISTRY=localhost:32000/ ./infra/kubernetes/deploy.sh
+```
+
+The script applies all manifests in order, then waits for StatefulSets, Jobs, and Deployments to reach ready state.
+
+| Flag | Description |
+|---|---|
+| `--dry-run` | Render manifests via `envsubst` without applying — review before applying |
+| `--delete` | Tear down all resources; PVCs are preserved to protect data |
+
+**3. Update /etc/hosts**
+
+```bash
+NODE_IP=$(kubectl get nodes \
+  -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+echo "$NODE_IP  catalog.local manage.catalog.local api.catalog.local" \
+  | sudo tee -a /etc/hosts
+```
+
+**4. Load sample data**
+
+```bash
+./infra/kubernetes/seed.sh --namespace odin-catalog
+```
+
+The seed script establishes `kubectl port-forward` tunnels to each service, waits for readiness, then delegates to `infra/seed/seed.sh` — the same Meridian Capital financial dataset scenario used with Docker Compose.
+
+| Flag | Default | Description |
+|---|---|---|
+| `--namespace` | `odin-catalog` | Kubernetes namespace |
+| `--api-key` | `dev-local` | `X-API-Key` header value |
+| `--context` | (current context) | `kubectl` context |
+| `--timeout` | `120` | Seconds to wait per service health check |
+
+**5. Access**
+
+| App | URL |
+|---|---|
+| Consumer (discovery) | `http://catalog.local` |
+| Producer (management) | `http://manage.catalog.local` |
+| API health | `http://api.catalog.local/inventory/actuator/health` |
+
+**Manifest inventory**
+
+| File | Contents |
+|---|---|
+| `00-namespace.yaml` | Namespace with `pod-security.kubernetes.io/enforce: privileged` |
+| `01-serviceaccount.yaml` | Default service account |
+| `02-secrets.yaml` | PostgreSQL passwords, MinIO credentials, Keycloak admin password |
+| `03-configmaps.yaml` | Common Spring config, Kafka topic script, OpenSearch index mapping, Keycloak realm |
+| `10-postgres.yaml` | Five StatefulSets: inventory, harvest, lineage (Apache AGE), identity, ai (pgvector) |
+| `11-kafka.yaml` | KRaft-mode Kafka StatefulSet (no ZooKeeper) |
+| `12-opensearch.yaml` | OpenSearch with privileged sysctl init container (`vm.max_map_count=262144`) |
+| `13-minio.yaml` | MinIO Deployment for harvest snapshots |
+| `14-redis.yaml` | Redis for Quartz scheduler clustering |
+| `15-keycloak.yaml` | Keycloak 24 with realm auto-import |
+| `20-backend-services.yaml` | Six Spring Boot Deployments + ClusterIP Services |
+| `21-frontends.yaml` | Producer and Consumer frontend Deployments + Services |
+| `22-ingress.yaml` | NGINX Ingress for all three virtual hosts |
+| `30-jobs.yaml` | One-shot Jobs: Kafka topic creation and OpenSearch index initialisation |
+
+> **Port collision:** Stop any local Docker Compose stack before running `seed.sh`. It uses ports 8001–8004 for port-forwarding.
+
+---
+
+### Kubernetes (Helm / MicroK8s)
+
+A Helm umbrella chart is provided under `infra/helm/` for clusters managed with Helm 3. A MicroK8s-specific `deploy.sh` under `infra/microk8s/` wraps the Helm install with sensible defaults.
+
+```bash
+# MicroK8s quick deploy
+./infra/microk8s/deploy.sh
+
+# Reduced resources for machines with < 16 GB RAM
+./infra/microk8s/deploy.sh --reduced-resources
+
+# Standard Helm install
+helm install odin infra/helm \
+  --namespace odin-catalog --create-namespace \
+  -f infra/microk8s/values.yaml
+
+# Upgrade after image rebuild
+helm upgrade odin infra/helm \
+  --namespace odin-catalog \
+  -f infra/microk8s/values.yaml
+```
+
+See [microk8s-deployment.md](microk8s-deployment.md) for the full MicroK8s setup guide including snap installation, addon enablement, and image registry configuration.
+
+---
+
+## Security Hardening
+
+The default Docker Compose stack is intentionally permissive for local development. Before deploying to any shared or internet-facing environment, apply the following mitigations.
+
+### Environment credentials
+
+All passwords in `docker-compose.yml` now default to weak fallbacks (`${VAR:-fallback}`). **Override every variable** in your deployment `.env` or secrets manager:
+
+| Variable | What it protects |
+|---|---|
+| `INVENTORY_DB_PASSWORD` … `AI_DB_PASSWORD` | Five PostgreSQL databases |
+| `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | MinIO object store |
+| `KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD` | Keycloak admin console |
+| `KEYCLOAK_CLIENT_SECRET` | Identity-service M2M Keycloak client |
+| `OPENSEARCH_INITIAL_ADMIN_PASSWORD` | OpenSearch admin account |
+
+### Dev API key bypass
+
+The `X-API-Key: dev-*` bypass is controlled by `APP_DEV_AUTH_ENABLED`. It is enabled in `docker-compose.yml` for local convenience. **Set `APP_DEV_AUTH_ENABLED=false` (or omit the variable) in any non-local deployment** to disable it entirely.
+
+### Keycloak
+
+- Use `start --optimized` (not `start-dev`) in production; configure `KC_HOSTNAME`, a TLS terminator, and an external PostgreSQL database.
+- Rotate the default realm client secret (`identity-service` client) via `KEYCLOAK_CLIENT_SECRET`.
+- Seed users are created with `temporary: true` passwords — they will be prompted to change on first login. Remove or replace them before going to production.
+
+### OpenSearch
+
+`DISABLE_SECURITY_PLUGIN: "true"` is set for local development. Enable the security plugin in production and configure TLS + authentication. Rotate `OPENSEARCH_INITIAL_ADMIN_PASSWORD` to a strong secret.
+
+### Kafka & Redis
+
+Kafka runs on PLAINTEXT with no authentication. Redis runs with no password. For production:
+- Kafka: enable SASL/SSL (`KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: SASL_SSL:SASL_SSL`).
+- Redis: set `requirepass` via a `REDIS_PASSWORD` environment variable and update the harvest-service config.
+
+### Network exposure
+
+All infrastructure ports (`5433–5437`, `9092`, `6379`, `9200`, `9000`, `8180`) are bound to `0.0.0.0` in the Compose file for local convenience. In production, either remove the `ports:` mappings entirely (containers communicate over `catalog-net`) or bind to `127.0.0.1`.
+
+### HTTPS / HSTS
+
+The nginx containers serve over HTTP. Terminate TLS at your load balancer or Traefik, then uncomment the `Strict-Transport-Security` header line in both `frontend/producer/nginx.conf` and `frontend/consumer/nginx.conf`.
 
 ---
 

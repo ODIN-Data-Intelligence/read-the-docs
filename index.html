@@ -887,7 +887,10 @@
         <a class="nav-link" onclick="show('model-logical')">Logical Models</a>
         <a class="nav-link" onclick="show('model-vocab')">Vocabulary &amp; FIBO</a>
         <a class="nav-link" onclick="show('model-vocab-ai')">Vocabulary &amp; AI</a>
+        <a class="nav-link" onclick="show('model-semantic')">Semantic Types</a>
         <a class="nav-link" onclick="show('model-lineage')">OpenLineage</a>
+        <a class="nav-link" onclick="show('model-terms')">Terms of Use (ODRL)</a>
+        <a class="nav-link" onclick="show('model-governance')">Governance &amp; Audit</a>
       </div>
 
       <div class="nav-divider"></div>
@@ -901,7 +904,7 @@
 
       <div class="nav-section">
         <span class="nav-group-label">Services</span>
-        <a class="nav-link" onclick="show('svc-catalog')">Catalog Service</a>
+        <a class="nav-link" onclick="show('svc-catalog')">Inventory Service</a>
         <a class="nav-link" onclick="show('svc-harvest')">Harvest Service</a>
         <a class="nav-link" onclick="show('svc-lineage')">Lineage Service</a>
         <a class="nav-link" onclick="show('svc-search')">Search Service</a>
@@ -912,9 +915,18 @@
       <div class="nav-divider"></div>
 
       <div class="nav-section">
+        <span class="nav-group-label">User Management</span>
+        <a class="nav-link" onclick="show('user-mgmt')">Roles &amp; Login</a>
+        <a class="nav-link" onclick="show('user-invite')">Inviting Users</a>
+        <a class="nav-link" onclick="show('user-keycloak')">Keycloak Setup</a>
+      </div>
+
+      <div class="nav-divider"></div>
+
+      <div class="nav-section">
         <span class="nav-group-label">API Reference</span>
         <a class="nav-link" onclick="show('api-auth')">Authentication</a>
-        <a class="nav-link" onclick="show('api-catalog')">Catalog API</a>
+        <a class="nav-link" onclick="show('api-catalog')">Inventory API</a>
         <a class="nav-link" onclick="show('api-harvest')">Harvest API</a>
         <a class="nav-link" onclick="show('api-lineage')">Lineage API</a>
         <a class="nav-link" onclick="show('api-search')">Search API</a>
@@ -927,6 +939,7 @@
         <span class="nav-group-label">Deployment</span>
         <a class="nav-link" onclick="show('deploy-compose')">Docker Compose</a>
         <a class="nav-link" onclick="show('deploy-env')">Environment Variables</a>
+        <a class="nav-link" onclick="show('deploy-k8s-raw')">Kubernetes (Raw Manifests)</a>
         <a class="nav-link" onclick="show('deploy-k8s')">Kubernetes (Helm)</a>
       </div>
 
@@ -964,6 +977,11 @@
             lifecycle stage, and access policy.</li>
           <li><strong>AI-powered Q&amp;A</strong> — a Spring AI RAG pipeline runs over your metadata corpus using Ollama
             (local) or OpenAI.</li>
+          <li><strong>AI metadata enrichment</strong> — per-element classification, description, and vocabulary concept recommendations, all owner-reviewed before acceptance.</li>
+          <li><strong>ODRL terms of use</strong> — access-level policy (OPEN → HIGHLY_RESTRICTED) derived automatically from element classifications and vocabulary mappings; displayed to consumers, governed by data owners.</li>
+          <li><strong>Accountable data ownership</strong> — role-based dataset ownership with a
+            proposal-and-approval transfer workflow and a full audit history. The governance dashboard surfaces
+            pending tasks and an activity feed for every user.</li>
           <li><strong>Zero lock-in</strong> — all metadata is exportable as DCAT 3.0 JSON-LD.</li>
         </ul>
 
@@ -1003,6 +1021,11 @@
             <td><strong>SKOS</strong></td>
             <td>W3C</td>
             <td>Mapping properties: exactMatch, closeMatch, relatedMatch</td>
+          </tr>
+          <tr>
+            <td><strong>ODRL</strong></td>
+            <td>W3C</td>
+            <td>Terms-of-use policies — permissions, prohibitions, obligations derived from element classifications and vocabulary concepts</td>
           </tr>
         </table>
 
@@ -1416,7 +1439,7 @@ docker compose --profile ai up -d</code></pre>
             <td><strong>identity-service</strong></td>
             <td>8006</td>
             <td>PostgreSQL 16</td>
-            <td>Keycloak OAuth2/OIDC integration, ABAC policies, API keys, tenant management</td>
+            <td>Keycloak OAuth2/OIDC, role-based access (Administrator, Data Owner, Steward, Governance), user provisioning with Keycloak sync, API keys, tenant management</td>
           </tr>
         </table>
 
@@ -1536,14 +1559,15 @@ docker compose --profile ai up -d</code></pre>
         </table>
 
         <h2>Tenant isolation</h2>
-        <p>Every resource row carries a <code>tenant_id</code> UUID. The <code>X-Tenant-Id</code> header (set by Traefik
-          or the frontend nginx) scopes all queries. Rows from other tenants are never returned.</p>
+        <p>Every resource row carries a <code>tenant_id</code> UUID. When using Keycloak JWT tokens, the tenant is extracted from the <code>tenant_id</code> claim automatically. When using API keys, the key's associated tenant is used. Rows from other tenants are never returned.</p>
 
         <div class="callout danger">
           <span class="callout-icon">✕</span>
           <div>Never use <code>X-API-Key: dev-*</code> in production. It grants unrestricted admin access to all
             tenants.</div>
         </div>
+
+        <p>See <a onclick="show('user-mgmt')" style="cursor:pointer">Roles &amp; Login</a> for the four defined roles, producer UI login flow, and how to add users in Keycloak.</p>
 
         <div class="page-nav">
           <a class="page-nav-btn" onclick="show('arch-events')">
@@ -1867,7 +1891,17 @@ curl http://localhost:8001/api/v1/catalogs/{id}/export \
           <tr>
             <td><code>name</code></td>
             <td>string</td>
-            <td>Business name: <em>Trade Amount</em>, <em>Settlement Currency</em></td>
+            <td>Technical element name (from harvest or manual entry)</td>
+          </tr>
+          <tr>
+            <td><code>label</code></td>
+            <td>string</td>
+            <td>Human-readable business name shown in the Model tab: <em>Trade Amount</em>, <em>Settlement Currency</em></td>
+          </tr>
+          <tr>
+            <td><code>description</code></td>
+            <td>string</td>
+            <td>Plain-English business description, curated by a steward or accepted from an AI recommendation</td>
           </tr>
           <tr>
             <td><code>logicalType</code></td>
@@ -1875,6 +1909,21 @@ curl http://localhost:8001/api/v1/catalogs/{id}/export \
             <td>Semantic type: <code>MonetaryAmount</code>, <code>Identifier</code>, <code>Date</code>,
               <code>Party</code>
             </td>
+          </tr>
+          <tr>
+            <td><code>classification</code></td>
+            <td>string</td>
+            <td>Accepted data sensitivity level: <code>PUBLIC</code>, <code>INTERNAL</code>, <code>CONFIDENTIAL</code>, <code>HIGH_CONFIDENTIAL</code></td>
+          </tr>
+          <tr>
+            <td><code>recommendedClassification</code></td>
+            <td>string</td>
+            <td>AI-suggested classification pending data owner review; cleared on accept/reject</td>
+          </tr>
+          <tr>
+            <td><code>classificationReasoning</code></td>
+            <td>string</td>
+            <td>One-sentence rationale produced alongside the AI classification recommendation</td>
           </tr>
           <tr>
             <td><code>physicalColumnIds</code></td>
@@ -1903,6 +1952,39 @@ curl http://localhost:8001/api/v1/catalogs/{id}/export \
   -H "Content-Type: application/json" \
   -H "X-API-Key: dev-local" \
   -d '{ "physicalColumnId": "b3f1a2e4-..." }'</code></pre>
+        </div>
+
+        <h2>AI description recommendation</h2>
+        <p>For each element in a model the AI service can generate a plain-English business description grounded in
+          the element's name, label, logical type, and vocabulary mappings. The recommendation is stored in a
+          <code>recommendedDescription</code> field and surfaced as an inline suggestion in the Model tab — a data
+          steward reviews and accepts or dismisses it.</p>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre><code class="language-bash"># Request a description recommendation for one element
+curl -s -X POST \
+  http://localhost:8001/api/v1/logical-data-elements/{elementId}/recommend-description \
+  -H "X-API-Key: dev-local"
+# → { "elementId": "...", "recommendedDescription": "The gross notional value of the trade,
+#      expressed in settlement currency before any netting adjustment." }
+
+# Accept the recommendation (writes to description field)
+curl -s -X POST \
+  http://localhost:8001/api/v1/logical-data-elements/{elementId}/accept-description \
+  -H "X-API-Key: dev-local"
+
+# Bulk — request descriptions for all elements in a model
+curl -s -X POST \
+  http://localhost:8001/api/v1/logical-models/{modelId}/recommend-descriptions \
+  -H "X-API-Key: dev-local"</code></pre>
+        </div>
+
+        <div class="callout info">
+          <span class="callout-icon">ℹ</span>
+          <div>Description recommendations are generated by the ai-service and stored on the element pending review.
+            They are never applied automatically — a steward or data owner must accept each one. Accepting a
+            recommendation writes the text to the <code>description</code> field and clears
+            <code>recommendedDescription</code>.</div>
         </div>
 
         <h2>Auto-scaffold from harvest</h2>
@@ -2142,12 +2224,19 @@ curl "http://localhost:8004/api/v1/search?fibo_concept=fibo-fnd-acc-cur%3ACurren
           across every dataset in the catalog.
         </p>
 
+        <h2>IRI → label translation</h2>
+        <p>Raw concept IRIs are never shown in the UI. The inventory-service resolves them to human-readable labels via
+          <code>GET /api/v1/vocabularies/translate?iri=&lt;iri&gt;</code> (single) and
+          <code>POST /api/v1/vocabularies/translate</code> (a JSON array of IRIs → an IRI→label map). The frontend
+          batches lookups and caches results in <code>localStorage</code>, so a mapping like
+          <code>fibo-fnd-acc-cur:Currency</code> renders as “Currency” everywhere.</p>
+
         <div class="page-nav">
           <a class="page-nav-btn" onclick="show('model-vocab')">
             <span class="dir">← Previous</span><span class="label">Vocabulary &amp; FIBO</span>
           </a>
-          <a class="page-nav-btn right" onclick="show('model-lineage')">
-            <span class="dir">Next →</span><span class="label">OpenLineage</span>
+          <a class="page-nav-btn right" onclick="show('model-semantic')">
+            <span class="dir">Next →</span><span class="label">Semantic Types</span>
           </a>
         </div>
       </article>
@@ -2199,11 +2288,220 @@ curl "http://localhost:8003/api/v1/datasets/TRADING_DB.BLOTTER/TRADE_BLOTTER/imp
         </p>
 
         <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('model-semantic')">
+            <span class="dir">← Previous</span><span class="label">Semantic Types</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('model-terms')">
+            <span class="dir">Next →</span><span class="label">Terms of Use (ODRL)</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     SEMANTIC TYPES
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-model-semantic" data-title="Semantic Types" data-section="Data Model">
+        <div class="breadcrumb"><span>Docs</span> › <span>Data Model</span> › Semantic Types</div>
+        <h1>Semantic Types</h1>
+        <p>A <strong>semantic type</strong> is the business domain type a dataset contains — e.g.
+          <code>Customer</code>, <code>DebitCardAccount</code>, <code>LoanOrCredit</code>. Types are derived
+          automatically from the vocabulary mappings on a dataset's <em>published</em> logical models, so they need no
+          curation beyond mapping elements to FIBO / schema.org / SKOS concepts.</p>
+
+        <h2>How a type is derived</h2>
+        <ul>
+          <li>Only <code>exactMatch</code> and <code>closeMatch</code> mappings count — stronger signals than broad,
+            related, or narrow matches.</li>
+          <li>The type is the terminal fragment of the concept IRI: everything after the last <code>/</code> or
+            <code>#</code>. For example <code>…/ClientsAndAccounts/Customer</code> → <code>Customer</code>, and
+            <code>https://schema.org/LoanOrCredit</code> → <code>LoanOrCredit</code>.</li>
+          <li>Types are de-duplicated across all elements of the dataset's published logical model(s).</li>
+        </ul>
+
+        <h2>Semantic context</h2>
+        <p>The full picture is returned by <code>GET /api/v1/datasets/{id}/semantic-context</code>:</p>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="language-bash">curl -s http://localhost:8001/api/v1/datasets/$ID/semantic-context \
+  -H "X-API-Key: dev-local"
+# → { "semanticTypes": ["Customer", "DebitCardAccount"],
+#     "vocabConceptLabels": [...], "fiboConcepts": [...],
+#     "logicalElementNames": [...], "logicalTypes": [...],
+#     "acceptedTags": [ { "id": "...", "type": "Customer", "vocabularyIri": "..." } ] }</code></pre>
+        </div>
+
+        <h2>Where types surface</h2>
+        <ul>
+          <li><strong>Search</strong> — indexed as the OpenSearch <code>semanticTypes</code> keyword field and exposed
+            as a facet (filter with <code>?semanticType=Customer</code>).</li>
+          <li><strong>Consumer UI</strong> — rendered as colour-coded badges on the dataset detail view (blue for FIBO,
+            green for schema.org).</li>
+          <li><strong>AI chat</strong> — types are embedded into the dataset's vector chunks, so questions like "which
+            datasets contain Customer data?" surface the right datasets.</li>
+          <li><strong>Manual tags</strong> — stewards can accept AI-recommended or hand-entered types via
+            <code>POST /api/v1/datasets/{id}/semantic-tags</code>; see the
+            <a onclick="show('svc-ai')">AI Service</a> for recommendations.</li>
+        </ul>
+
+        <div class="page-nav">
           <a class="page-nav-btn" onclick="show('model-vocab-ai')">
             <span class="dir">← Previous</span><span class="label">Vocabulary &amp; AI</span>
           </a>
+          <a class="page-nav-btn right" onclick="show('model-lineage')">
+            <span class="dir">Next →</span><span class="label">OpenLineage</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     GOVERNANCE & AUDIT
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-model-governance" data-title="Governance &amp; Audit" data-section="Data Model">
+        <div class="breadcrumb"><span>Docs</span> › <span>Data Model</span> › Governance &amp; Audit</div>
+        <h1>Governance &amp; Audit</h1>
+        <p>Every dataset has an optional <strong>data owner</strong> and an immutable <strong>audit history</strong>.
+          Ownership only changes hands through a proposal workflow, so a transfer is never unilateral.</p>
+
+        <h2>Assigning an owner</h2>
+        <p>An unowned dataset can be claimed with <code>PUT /api/v1/datasets/{id}/owner</code>
+          (body <code>{"userId":"..."}</code>). If the dataset already has an owner the call is rejected with
+          <code>409</code> — use the transfer workflow instead.</p>
+
+        <h2>Ownership transfer workflow</h2>
+        <ol>
+          <li><strong>Propose</strong> — <code>POST /api/v1/datasets/{id}/ownership-proposals</code> with
+            <code>{"proposedOwnerId":"..."}</code> creates a <code>PENDING</code> proposal.</li>
+          <li><strong>Approve / reject</strong> — only the current owner (or a catalog admin) may call
+            <code>…/ownership-proposals/{proposalId}/approve</code> or <code>…/reject</code>. Approval atomically
+            updates the dataset's <code>ownerId</code>.</li>
+          <li><strong>Pending queue</strong> — <code>GET …/ownership-proposals/pending</code> returns the open
+            proposal, or <code>204</code> if none.</li>
+        </ol>
+        <p>A proposal carries <code>status</code> (<code>PENDING</code> / <code>APPROVED</code> /
+          <code>REJECTED</code>), <code>proposedOwnerId</code>, <code>proposedById</code>, and timestamps.</p>
+
+        <h2>Audit history</h2>
+        <p><code>GET /api/v1/datasets/{id}/history</code> returns a reverse-chronological, paginated log. Each entry
+          records the <code>eventType</code>, who made the change (<code>changedById</code> /
+          <code>changedByEmail</code>), and JSON snapshots <code>payloadBefore</code> / <code>payloadAfter</code>.</p>
+        <p>Tracked events: <code>CREATED</code>, <code>UPDATED</code>, <code>DELETED</code>,
+          <code>OWNER_ASSIGNED</code>, <code>OWNER_TRANSFER_PROPOSED</code>, <code>OWNER_TRANSFER_APPROVED</code>,
+          <code>OWNER_TRANSFER_REJECTED</code>.</p>
+
+        <h2>AI action gating</h2>
+        <p>Accepting or rejecting an AI-generated classification recommendation is gated to the dataset's current data
+          owner. The producer UI enforces this in the Model tab — the Accept / Reject buttons are shown only when the
+          logged-in user is the dataset owner or an administrator. The same restriction applies to description
+          recommendations. This ensures that AI suggestions never modify metadata without an accountable human
+          approving the change.</p>
+        <table>
+          <tr><th>Action</th><th>Who can perform it</th></tr>
+          <tr><td>Accept / reject AI classification</td><td>Data Owner, Administrator</td></tr>
+          <tr><td>Accept / reject AI description</td><td>Data Owner, Administrator</td></tr>
+          <tr><td>Accept / reject AI vocabulary concept recommendations</td><td>Data Owner, Administrator</td></tr>
+          <tr><td>Accept / reset ODRL terms of use policy</td><td>Data Owner only</td></tr>
+          <tr><td>Accept physical schema AI mappings</td><td>Data Owner only</td></tr>
+          <tr><td>Approve / reject ownership transfer</td><td>Current Data Owner, Administrator</td></tr>
+          <tr><td>Direct owner assignment (unowned dataset)</td><td>Administrator</td></tr>
+          <tr><td>Propose ownership transfer</td><td>Data Governance Officer, Data Steward, current Data Owner</td></tr>
+        </table>
+
+        <h2>Governance dashboard</h2>
+        <p>The producer UI dashboard (<code>http://localhost:3000/{tenant}</code>) provides a personal governance view
+          for every logged-in user:</p>
+        <ul>
+          <li><strong>Stat cards</strong> — count of datasets and data products the user owns.</li>
+          <li><strong>Outstanding Tasks</strong> — pending ownership transfer proposals directed at the user
+            (nomination or transfer awaiting their acceptance).</li>
+          <li><strong>My Proposals</strong> — ownership proposals the user has submitted or been nominated for, with
+            current status (Pending / Approved / Rejected) and resolution notes.</li>
+          <li><strong>My Changes</strong> — a chronological feed of dataset events the user performed: Created,
+            Updated, Assigned Owner, Proposed Transfer, Approved/Rejected Transfer.</li>
+        </ul>
+        <p>The dashboard data is served by <code>GET /api/v1/dashboard/summary</code> (stat counts) and
+          <code>GET /api/v1/dashboard/activity</code> (proposals + changes feed) on the inventory-service.</p>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('model-terms')">
+            <span class="dir">← Previous</span><span class="label">Terms of Use (ODRL)</span>
+          </a>
           <a class="page-nav-btn right" onclick="show('erd')">
             <span class="dir">Next →</span><span class="label">Database ERDs</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     TERMS OF USE (ODRL)
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-model-terms" data-title="Terms of Use (ODRL)" data-section="Data Model">
+        <div class="breadcrumb"><span>Docs</span> › <span>Data Model</span> › Terms of Use (ODRL)</div>
+        <h1>Terms of Use (ODRL)</h1>
+        <p>ODIN derives a machine-readable <a href="https://www.w3.org/TR/odrl-model/">ODRL</a> terms-of-use policy for
+          every dataset automatically — no manual policy authoring required. The policy is inferred from two signals
+          already present in the catalog: <strong>element classifications</strong> and <strong>vocabulary concept
+          mappings</strong>.</p>
+
+        <h2>How derivation works</h2>
+        <ol>
+          <li><strong>Effective classification</strong> — the most restrictive accepted <code>classification</code>
+            across all published logical model elements determines the access level. Order:
+            <code>HIGH_CONFIDENTIAL &gt; CONFIDENTIAL &gt; INTERNAL &gt; PUBLIC</code>.</li>
+          <li><strong>Regulatory signals</strong> — FIBO vocabulary IRI prefixes (<code>fibo-fbc</code>,
+            <code>fibo-sec</code>, <code>fibo-md</code>) and dataset keywords (<code>mifid</code>, <code>emir</code>,
+            <code>gdpr</code>, <code>basel</code>, <code>finrep</code>) identify applicable regulatory frameworks and
+            add corresponding obligations (e.g. "Comply with market data vendor licence terms" when
+            <code>fibo-md</code> concepts are mapped).</li>
+        </ol>
+
+        <h2>Access levels</h2>
+        <table>
+          <tr><th>Effective classification</th><th>Access level</th><th>Default stance</th></tr>
+          <tr><td><code>PUBLIC</code></td><td>OPEN</td><td>Use and redistribute freely with attribution</td></tr>
+          <tr><td><code>INTERNAL</code></td><td>INTERNAL_ONLY</td><td>Internal use only; no external distribution</td></tr>
+          <tr><td><code>CONFIDENTIAL</code></td><td>RESTRICTED</td><td>Approved analytics only; notify data owner before AI/ML use</td></tr>
+          <tr><td><code>HIGH_CONFIDENTIAL</code></td><td>HIGHLY_RESTRICTED</td><td>Explicit written approval required; full audit trail</td></tr>
+        </table>
+
+        <h2>API</h2>
+        <table>
+          <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+          <tr><td><code>GET</code></td><td><code>/api/v1/datasets/{id}/terms-of-use</code></td><td>Derive (or return explicit) ODRL policy. Returns <code>effectiveClassification</code>, <code>accessLevel</code>, <code>permissions</code>, <code>prohibitions</code>, <code>obligations</code>, <code>applicableRegulations</code>, <code>odrlPolicy</code>, <code>policySource</code>, <code>derivationDetails</code>.</td></tr>
+          <tr><td><code>POST</code></td><td><code>/api/v1/datasets/{id}/terms-of-use/accept</code></td><td>Lock the derived policy as <code>hasPolicy</code> on the dataset (data owner only).</td></tr>
+          <tr><td><code>DELETE</code></td><td><code>/api/v1/datasets/{id}/terms-of-use/policy</code></td><td>Clear the explicit policy; revert to dynamic derivation.</td></tr>
+        </table>
+
+        <h2>Accept pre-condition</h2>
+        <p>The <strong>Accept Policy</strong> action requires that every element in the published logical model has both
+          an accepted <code>classification</code> and at least one vocabulary concept mapping. While unmet, the producer
+          UI shows per-element readiness hints — e.g. "3 elements still need classification" — rather than disabling the
+          button silently.</p>
+
+        <h2>Policy source</h2>
+        <p>The <code>policySource</code> field in the response indicates provenance:</p>
+        <ul>
+          <li><strong><code>derived</code></strong> — computed live from current classifications and vocabulary mappings.</li>
+          <li><strong><code>explicit</code></strong> — a data owner has accepted and locked the derived policy via <code>POST .../accept</code>. The stored ODRL JSON is returned as-is.</li>
+          <li><strong><code>fallback</code></strong> — no element classifications found; terms fall back to the dataset's declared <code>license</code> / <code>accessRights</code> / <code>rightsStatement</code> fields.</li>
+        </ul>
+
+        <h2>Consumer UI</h2>
+        <p>Every dataset in the consumer discovery drawer has a <strong>Terms</strong> tab showing the access level badge
+          (colour-coded), Permitted Uses, Restrictions, Obligations, Applicable Regulations (as pills), and a
+          collapsible ODRL JSON block for technical consumers.</p>
+
+        <h2>Producer UI</h2>
+        <p>The producer Governance tab shows a <strong>Terms of Use Policy</strong> panel with derivation details
+          (classified element count, vocabulary concept count, matched signals). The data owner can <strong>Accept
+          Policy</strong> to lock the derived terms, or <strong>Reset to Derived</strong> to clear a locked policy.</p>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('model-lineage')">
+            <span class="dir">← Previous</span><span class="label">OpenLineage</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('model-governance')">
+            <span class="dir">Next →</span><span class="label">Governance &amp; Audit</span>
           </a>
         </div>
       </article>
@@ -2804,21 +3102,21 @@ curl "http://localhost:8003/api/v1/datasets/TRADING_DB.BLOTTER/TRADE_BLOTTER/imp
         </div>
 
         <div class="page-nav">
-          <a class="page-nav-btn" onclick="show('model-lineage')">
-            <span class="dir">← Previous</span><span class="label">OpenLineage</span>
+          <a class="page-nav-btn" onclick="show('model-governance')">
+            <span class="dir">← Previous</span><span class="label">Governance &amp; Audit</span>
           </a>
           <a class="page-nav-btn right" onclick="show('svc-catalog')">
-            <span class="dir">Next →</span><span class="label">Catalog Service</span>
+            <span class="dir">Next →</span><span class="label">Inventory Service</span>
           </a>
         </div>
       </article>
 
       <!-- ════════════════════════════════════════════════════════════
-     CATALOG SERVICE
+     INVENTORY SERVICE
      ════════════════════════════════════════════════════════════ -->
-      <article class="page" id="page-svc-catalog" data-title="Catalog Service" data-section="Services">
-        <div class="breadcrumb"><span>Docs</span> › <span>Services</span> › Catalog Service</div>
-        <h1>Catalog Service</h1>
+      <article class="page" id="page-svc-catalog" data-title="Inventory Service" data-section="Services">
+        <div class="breadcrumb"><span>Docs</span> › <span>Services</span> › Inventory Service</div>
+        <h1>Inventory Service</h1>
         <p>The inventory-service is the primary metadata store. It owns all DCAT, DPROD, CSV-W, logical model, and
           vocabulary resources. All other services treat it as the source of truth.</p>
 
@@ -2906,7 +3204,7 @@ curl "http://localhost:8003/api/v1/datasets/TRADING_DB.BLOTTER/TRADE_BLOTTER/imp
 
         <div class="page-nav">
           <a class="page-nav-btn" onclick="show('svc-catalog')">
-            <span class="dir">← Previous</span><span class="label">Catalog Service</span>
+            <span class="dir">← Previous</span><span class="label">Inventory Service</span>
           </a>
           <a class="page-nav-btn right" onclick="show('svc-lineage')">
             <span class="dir">Next →</span><span class="label">Lineage Service</span>
@@ -2970,10 +3268,18 @@ curl "http://localhost:8004/api/v1/search?q=trade&type=dataset&domain=Finance&ha
 curl "http://localhost:8004/api/v1/search?fibo_concept=MonetaryAmount" \
   -H "X-API-Key: dev-local"
 
+# Semantic type facet search
+curl "http://localhost:8004/api/v1/search?semanticType=Customer" \
+  -H "X-API-Key: dev-local"
+
 # Autocomplete suggestions
 curl "http://localhost:8004/api/v1/search/suggest?q=trad" \
   -H "X-API-Key: dev-local"</code></pre>
         </div>
+
+        <p>Datasets are indexed with a <code>semanticTypes</code> keyword field derived from their vocabulary
+          mappings, exposed as both a filter and an aggregation facet. See
+          <a onclick="show('model-semantic')">Semantic Types</a>.</p>
 
         <h2>Reindex</h2>
         <div class="code-block">
@@ -3027,6 +3333,71 @@ curl -N -X POST http://localhost:8005/api/v1/conversations/$CONV/messages \
           configured model, and upserts into the pgvector store.
         </p>
 
+        <h2>Element classification &amp; description</h2>
+        <p>The ai-service provides two metadata enrichment operations for logical data elements:</p>
+        <ul>
+          <li><strong>Classification</strong> — infers a data sensitivity level (<code>PUBLIC</code>,
+            <code>INTERNAL</code>, <code>CONFIDENTIAL</code>, or <code>HIGH_CONFIDENTIAL</code>) from the element's
+            name, logical type, and FIBO / schema.org vocabulary mappings. Returns a one-sentence reasoning.</li>
+          <li><strong>Description</strong> — generates a plain-English business description grounded in the element's
+            context. Descriptions are surfaced in the Model tab's Description column as inline suggestions pending
+            owner review.</li>
+        </ul>
+        <p>Both operations are triggered via the inventory-service proxy (which owns persistence). Results are stored
+          as <code>recommendedClassification</code> / <code>recommendedDescription</code> on the element and
+          cleared when accepted or rejected. Only the dataset's data owner may accept recommendations.</p>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="language-bash">curl -s -X POST http://localhost:8005/api/v1/classify/elements \
+  -H "X-API-Key: dev-local" -H "Content-Type: application/json" \
+  -d '{
+    "elements": [
+      { "elementId": "e1", "name": "ssn", "label": "Social Security Number",
+        "logicalType": "string", "vocabConceptLabels": ["Person Identifier"] }
+    ]
+  }'
+# → { "results": [ { "elementId": "e1",
+#       "classification": "HIGH_CONFIDENTIAL", "reasoning": "..." } ] }</code></pre>
+        </div>
+
+        <h2>Element description endpoint</h2>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre><code class="language-bash">curl -s -X POST http://localhost:8005/api/v1/describe/elements \
+  -H "X-API-Key: dev-local" -H "Content-Type: application/json" \
+  -d '{
+    "elements": [
+      { "elementId": "e1", "name": "trade_amt", "label": "Trade Amount",
+        "logicalType": "MonetaryAmount",
+        "vocabConceptLabels": ["MonetaryAmount", "Currency"] }
+    ]
+  }'
+# → { "results": [ { "elementId": "e1",
+#       "description": "The gross notional value of the trade in settlement currency,
+#                       recorded pre-netting." } ] }</code></pre>
+        </div>
+
+        <h2>Semantic recommendations</h2>
+        <p>Analyses a dataset's metadata (title, description, keywords, element names, logical types, and current
+          vocabulary mappings) and recommends additional business domain types and vocabulary concepts to improve
+          semantic coverage. The producer UI calls this through the inventory-service proxy
+          <code>POST /api/v1/datasets/{id}/recommend-semantic-context</code>.</p>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="language-bash">curl -s -X POST http://localhost:8005/api/v1/recommend-semantic-context \
+  -H "X-API-Key: dev-local" -H "Content-Type: application/json" \
+  -d '{
+    "datasetId": "...", "title": "Retail Customer Accounts",
+    "keywords": ["customer", "account"],
+    "elementNames": ["customer_id", "balance"],
+    "currentVocabLabels": ["Customer"]
+  }'
+# → { "types": [ { "type": "DebitCardAccount",
+#       "rationale": "...", "vocabularyHint": "FIBO" } ], "rationale": "..." }</code></pre>
+        </div>
+
         <div class="callout tip">
           <span class="callout-icon">✓</span>
           <div>The ai-service is optional. Start it with
@@ -3050,22 +3421,281 @@ curl -N -X POST http://localhost:8005/api/v1/conversations/$CONV/messages \
       <article class="page" id="page-svc-identity" data-title="Identity Service" data-section="Services">
         <div class="breadcrumb"><span>Docs</span> › <span>Services</span> › Identity Service</div>
         <h1>Identity Service</h1>
+        <p><strong>Port:</strong> 8006 &nbsp;|&nbsp; <strong>Database:</strong> PostgreSQL 16 (port 5436) + Keycloak (port 8180)</p>
         <p>The identity-service manages organisations, users, roles, and access policies. It integrates with Keycloak 24
-          for OIDC token issuance and validation.</p>
+          for OIDC token issuance and validation. All other backend services validate JWTs issued by Keycloak.</p>
 
-        <h2>Keycloak configuration</h2>
-        <p>A realm export is included at <code>infra/keycloak/realm-export.json</code>. The realm is imported
-          automatically on first startup. Keycloak runs on port 8180.</p>
+        <h2>Responsibilities</h2>
+        <ul>
+          <li>User provisioning (invite, list, enable/disable) backed by the Keycloak Admin REST API — changes made
+            in the producer Admin › Users UI are written directly to Keycloak and synced to the local
+            <code>catalog_users</code> table</li>
+          <li>Bidirectional Keycloak sync — on startup the service imports any existing Keycloak users into the local
+            catalog database so that user references (e.g. <code>ownerId</code>) resolve correctly</li>
+          <li>Organisation and domain management</li>
+          <li>Long-lived API key issuance (stored as SHA-256 hashes)</li>
+          <li>ABAC policy evaluation</li>
+          <li>JWT issuer — all services trust <code>http://keycloak:8180/realms/datacatalog</code></li>
+        </ul>
+
+        <h2>Keycloak realm</h2>
+        <p>The <code>datacatalog</code> realm is auto-imported from <code>infra/keycloak/datacatalog-realm.json</code> on first startup. Subsequent changes must be made via the Keycloak Admin Console or REST API — the file is only read against a fresh database.</p>
+
+        <table>
+          <tr><th>Item</th><th>Value</th></tr>
+          <tr><td>Admin console</td><td><code>http://localhost:8180</code></td></tr>
+          <tr><td>Admin credentials</td><td><code>admin</code> / <code>admin</code></td></tr>
+          <tr><td>Realm</td><td><code>datacatalog</code></td></tr>
+          <tr><td>Frontend client</td><td><code>catalog-frontend</code> (public, PKCE)</td></tr>
+        </table>
 
         <div class="callout info">
           <span class="callout-icon">ℹ</span>
-          <div>Keycloak 24 uses <code>KEYCLOAK_ADMIN</code> and <code>KEYCLOAK_ADMIN_PASSWORD</code> environment
-            variables. The old <code>KC_BOOTSTRAP_ADMIN_*</code> variables are not supported.</div>
+          <div>Keycloak 24 uses <code>KEYCLOAK_ADMIN</code> and <code>KEYCLOAK_ADMIN_PASSWORD</code> environment variables. The old <code>KC_BOOTSTRAP_ADMIN_*</code> variables are not supported.</div>
         </div>
+
+        <p>For roles, default users, and how to invite new users see <a onclick="show('user-mgmt')" style="cursor:pointer">Roles &amp; Login →</a></p>
 
         <div class="page-nav">
           <a class="page-nav-btn" onclick="show('svc-ai')">
             <span class="dir">← Previous</span><span class="label">AI Service</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('user-mgmt')">
+            <span class="dir">Next →</span><span class="label">Roles &amp; Login</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     USER MANAGEMENT — ROLES & LOGIN
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-user-mgmt" data-title="Roles & Login" data-section="User Management">
+        <div class="breadcrumb"><span>Docs</span> › <span>User Management</span> › Roles &amp; Login</div>
+        <h1>Roles &amp; Login</h1>
+        <p>The <strong>producer UI</strong> (<code>http://localhost:3000</code>) requires login before any content is shown. The <strong>consumer UI</strong> (<code>http://localhost:3001</code>) is read-only and does not require authentication.</p>
+
+        <h2>Login flow</h2>
+        <ol>
+          <li>User visits the producer UI → redirected to the Keycloak login page automatically</li>
+          <li>User logs in with email and password</li>
+          <li>Keycloak issues an OIDC access token (JWT) via Authorization Code + PKCE</li>
+          <li>The producer app stores the token in memory and sends it as <code>Authorization: Bearer &lt;token&gt;</code> on every API call</li>
+          <li>Backend services validate the JWT against the Keycloak JWKS endpoint</li>
+          <li>The token is refreshed automatically every 30 seconds before it expires</li>
+          <li>Click <strong>Sign out</strong> in the sidebar to terminate the Keycloak session</li>
+        </ol>
+
+        <h2>Roles</h2>
+        <table>
+          <tr><th>Display name</th><th>Keycloak name</th><th>Description</th><th>Admin nav</th></tr>
+          <tr>
+            <td><strong>Administrator</strong></td><td><code>administrator</code></td>
+            <td>Full platform access — users, harvest sources, all data assets, settings</td>
+            <td>All items</td>
+          </tr>
+          <tr>
+            <td><strong>Data Governance</strong></td><td><code>data-governance</code></td>
+            <td>Governs data quality and compliance across domains</td>
+            <td>Domains only</td>
+          </tr>
+          <tr>
+            <td><strong>Data Owner</strong></td><td><code>data-owner</code></td>
+            <td>Owns and manages data products and datasets in their domain</td>
+            <td>Hidden</td>
+          </tr>
+          <tr>
+            <td><strong>Data Steward</strong></td><td><code>data-steward</code></td>
+            <td>Curates metadata, semantic annotations, and logical models</td>
+            <td>Hidden</td>
+          </tr>
+        </table>
+
+        <h2>Role → backend permissions</h2>
+        <table>
+          <tr><th>Role</th><th>Permissions claim values</th><th>Effect</th></tr>
+          <tr><td>Administrator</td><td><code>catalog:read</code>, <code>catalog:write</code>, <code>catalog:admin</code></td><td>Full API access</td></tr>
+          <tr><td>Data Governance</td><td><code>catalog:read</code>, <code>catalog:write</code></td><td>Read + mutate; no admin-only endpoints</td></tr>
+          <tr><td>Data Owner</td><td><code>catalog:read</code>, <code>catalog:write</code></td><td>Read + mutate; no admin-only endpoints</td></tr>
+          <tr><td>Data Steward</td><td><code>catalog:read</code>, <code>catalog:write</code></td><td>Read + mutate; no admin-only endpoints</td></tr>
+        </table>
+
+        <h2>Default users</h2>
+        <table>
+          <tr><th>Email</th><th>Password</th><th>Role</th></tr>
+          <tr><td><code>admin@datacatalog.local</code></td><td><code>admin</code></td><td>Administrator</td></tr>
+          <tr><td><code>governance@datacatalog.local</code></td><td><code>password</code></td><td>Data Governance</td></tr>
+          <tr><td><code>owner@datacatalog.local</code></td><td><code>password</code></td><td>Data Owner</td></tr>
+          <tr><td><code>steward@datacatalog.local</code></td><td><code>password</code></td><td>Data Steward</td></tr>
+        </table>
+
+        <div class="callout warn">
+          <span class="callout-icon">⚠</span>
+          <div>Change all passwords before exposing the stack to a network.</div>
+        </div>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('svc-identity')">
+            <span class="dir">← Previous</span><span class="label">Identity Service</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('user-invite')">
+            <span class="dir">Next →</span><span class="label">Inviting Users</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     USER MANAGEMENT — INVITING USERS
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-user-invite" data-title="Inviting Users" data-section="User Management">
+        <div class="breadcrumb"><span>Docs</span> › <span>User Management</span> › Inviting Users</div>
+        <h1>Inviting Users</h1>
+        <p>Users are managed through the Keycloak Admin Console. The identity-service user API (<code>POST /api/v1/users/invite</code>) is the programmatic path for the same workflow.</p>
+
+        <h2>Via Keycloak Admin Console</h2>
+        <ol>
+          <li>Open <code>http://localhost:8180</code> and log in as <code>admin</code> / <code>admin</code></li>
+          <li>Select the <strong>datacatalog</strong> realm from the top-left dropdown</li>
+          <li>Go to <strong>Users</strong> → <strong>Add user</strong></li>
+          <li>Set <strong>Email</strong>, <strong>First name</strong>, <strong>Last name</strong>; enable <strong>Email verified</strong>; click <strong>Create</strong></li>
+          <li>On the <strong>Credentials</strong> tab → set a temporary password and click <strong>Save password</strong></li>
+          <li>On the <strong>Role mapping</strong> tab → click <strong>Assign role</strong> → select one of the four catalog roles</li>
+          <li>On the <strong>Attributes</strong> tab → add the following key/value pairs:</li>
+        </ol>
+
+        <table>
+          <tr><th>Key</th><th>Value(s)</th><th>Notes</th></tr>
+          <tr>
+            <td><code>tenant_id</code></td>
+            <td><code>00000000-0000-0000-0000-000000000001</code></td>
+            <td>Single value. Must match the tenant UUID in the database.</td>
+          </tr>
+          <tr>
+            <td><code>permissions</code></td>
+            <td>See table below</td>
+            <td>Add one value per row in Keycloak (multivalued attribute).</td>
+          </tr>
+        </table>
+
+        <h2>Permissions attribute by role</h2>
+        <table>
+          <tr><th>Role</th><th>Permission values (one per row)</th></tr>
+          <tr><td>Administrator</td><td><code>catalog:read</code>, <code>catalog:write</code>, <code>catalog:admin</code></td></tr>
+          <tr><td>Data Governance</td><td><code>catalog:read</code>, <code>catalog:write</code></td></tr>
+          <tr><td>Data Owner</td><td><code>catalog:read</code>, <code>catalog:write</code></td></tr>
+          <tr><td>Data Steward</td><td><code>catalog:read</code>, <code>catalog:write</code></td></tr>
+        </table>
+
+        <div class="callout info">
+          <span class="callout-icon">ℹ</span>
+          <div>The <code>tenant_id</code> and <code>permissions</code> attributes are mapped into the JWT by Keycloak protocol mappers. Without them the backend services will reject the token with 403.</div>
+        </div>
+
+        <h2>Force logout / session revocation</h2>
+        <p>To expire all active sessions for a user (e.g. after a role change takes effect):</p>
+        <ol>
+          <li>Keycloak Admin Console → <strong>Users</strong> → select the user</li>
+          <li><strong>Sessions</strong> tab → <strong>Sign out all sessions</strong></li>
+        </ol>
+        <p>The user will be redirected to the login page on their next API call.</p>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('user-mgmt')">
+            <span class="dir">← Previous</span><span class="label">Roles &amp; Login</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('user-keycloak')">
+            <span class="dir">Next →</span><span class="label">Keycloak Setup</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     USER MANAGEMENT — KEYCLOAK SETUP
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-user-keycloak" data-title="Keycloak Setup" data-section="User Management">
+        <div class="breadcrumb"><span>Docs</span> › <span>User Management</span> › Keycloak Setup</div>
+        <h1>Keycloak Setup</h1>
+
+        <h2>Realm</h2>
+        <table>
+          <tr><th>Property</th><th>Value</th></tr>
+          <tr><td>Realm name</td><td><code>datacatalog</code></td></tr>
+          <tr><td>Admin console</td><td><code>http://localhost:8180</code></td></tr>
+          <tr><td>Admin credentials</td><td><code>KEYCLOAK_ADMIN</code> / <code>KEYCLOAK_ADMIN_PASSWORD</code> (default: <code>admin</code> / <code>admin</code>)</td></tr>
+          <tr><td>Import file</td><td><code>infra/keycloak/datacatalog-realm.json</code> (loaded on first startup only)</td></tr>
+          <tr><td>Access token lifetime</td><td>1 hour</td></tr>
+        </table>
+
+        <h2>Clients</h2>
+        <table>
+          <tr><th>Client ID</th><th>Type</th><th>Used by</th></tr>
+          <tr>
+            <td><code>catalog-frontend</code></td>
+            <td>Public (PKCE)</td>
+            <td>Producer and consumer browser apps — Authorization Code flow with PKCE</td>
+          </tr>
+          <tr>
+            <td><code>identity-service</code></td>
+            <td>Confidential (service account)</td>
+            <td>Backend M2M calls to Keycloak Admin API</td>
+          </tr>
+          <tr>
+            <td><code>catalog-api</code></td>
+            <td>Bearer-only (resource server)</td>
+            <td>Validates JWT tokens on behalf of backend services</td>
+          </tr>
+        </table>
+
+        <h2>Protocol mappers (catalog-scopes)</h2>
+        <table>
+          <tr><th>Mapper name</th><th>JWT claim</th><th>Type</th><th>Purpose</th></tr>
+          <tr>
+            <td><code>tenant_id</code></td>
+            <td><code>tenant_id</code></td>
+            <td>String</td>
+            <td>Tenant scoping for all backend database queries</td>
+          </tr>
+          <tr>
+            <td><code>permissions</code></td>
+            <td><code>permissions</code></td>
+            <td>JSON array (multivalued)</td>
+            <td>Spring Security authority grants (<code>SCOPE_catalog:read</code> etc.)</td>
+          </tr>
+          <tr>
+            <td><code>realm_roles</code></td>
+            <td><code>realm_access.roles</code></td>
+            <td>String array</td>
+            <td>Frontend role-based UI visibility (nav gating, feature flags)</td>
+          </tr>
+        </table>
+
+        <h2>Applying realm changes</h2>
+        <p>The realm JSON is only imported on a fresh database. For an already-running stack, use the Keycloak Admin Console or the Admin REST API to apply changes:</p>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre><code class="language-bash"># Get an admin token
+TOKEN=$(curl -s -X POST http://localhost:8180/realms/master/protocol/openid-connect/token \
+  -d "client_id=admin-cli&username=admin&password=admin&grant_type=password" \
+  | jq -r .access_token)
+
+# List current roles
+curl -s -H "Authorization: Bearer $TOKEN" \
+  http://localhost:8180/admin/realms/datacatalog/roles | jq '.[].name'
+
+# Create a new role
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"my-role","description":"Custom role"}' \
+  http://localhost:8180/admin/realms/datacatalog/roles</code></pre>
+        </div>
+
+        <div class="callout tip">
+          <span class="callout-icon">✓</span>
+          <div>To re-import a fresh realm, delete the Keycloak Postgres volume and restart: <code>docker compose down keycloak postgres-identity &amp;&amp; docker volume rm data-catalog_identity-pgdata &amp;&amp; docker compose up -d keycloak postgres-identity</code>. <strong>This erases all existing users.</strong></div>
+        </div>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('user-invite')">
+            <span class="dir">← Previous</span><span class="label">Inviting Users</span>
           </a>
           <a class="page-nav-btn right" onclick="show('api-auth')">
             <span class="dir">Next →</span><span class="label">Authentication</span>
@@ -3082,56 +3712,50 @@ curl -N -X POST http://localhost:8005/api/v1/conversations/$CONV/messages \
 
         <h2>Request headers</h2>
         <table>
-          <tr>
-            <th>Header</th>
-            <th>Required</th>
-            <th>Description</th>
-          </tr>
+          <tr><th>Header</th><th>Required</th><th>Description</th></tr>
           <tr>
             <td><code>Authorization: Bearer &lt;jwt&gt;</code></td>
             <td>One of these two</td>
-            <td>Keycloak OIDC access token</td>
+            <td>Keycloak OIDC access token. Tenant ID is extracted from the <code>tenant_id</code> JWT claim automatically.</td>
           </tr>
           <tr>
             <td><code>X-API-Key: &lt;key&gt;</code></td>
             <td>One of these two</td>
-            <td>API key from identity-service</td>
-          </tr>
-          <tr>
-            <td><code>X-Tenant-Id: &lt;uuid&gt;</code></td>
-            <td>Yes</td>
-            <td>Tenant scoping — set by Traefik/nginx in production</td>
+            <td>Long-lived API key issued by identity-service. Tenant is resolved from the key record.</td>
           </tr>
         </table>
 
-        <h2>Dev API key</h2>
-        <p>Any key starting with <code>dev-</code> bypasses authentication and grants <code>catalog:admin</code> scope.
-          The tenant ID defaults to <code>00000000-0000-0000-0000-000000000001</code>.</p>
+        <h2>Dev API key (local development only)</h2>
+        <p>Any key starting with <code>dev-</code> bypasses Keycloak entirely and grants <code>catalog:admin</code> scope with tenant <code>00000000-0000-0000-0000-000000000001</code>. Use it for curl smoke tests and CI pipelines that don't need a real login.</p>
         <div class="code-block">
-          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
-          </div>
-          <pre><code class="language-bash"># These are equivalent for local development:
-curl -H "X-API-Key: dev-anything" ...
-curl -H "X-API-Key: dev-local" ...
-curl -H "X-API-Key: dev-my-test-key" ...</code></pre>
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre><code class="language-bash">curl -H "X-API-Key: dev-local" http://localhost:8001/api/v1/datasets</code></pre>
         </div>
 
+        <div class="callout danger">
+          <span class="callout-icon">✕</span>
+          <div>Never use <code>X-API-Key: dev-*</code> in production. It grants unrestricted admin access to all tenants with no authentication.</div>
+        </div>
+
+        <h2>Producer UI authentication</h2>
+        <p>The producer UI uses the Keycloak <code>catalog-frontend</code> public client (Authorization Code + PKCE). Visiting <code>http://localhost:3000</code> redirects unauthenticated users to the Keycloak login page automatically. See <a onclick="show('user-mgmt')" style="cursor:pointer">Roles &amp; Login</a> for details.</p>
+
         <div class="page-nav">
-          <a class="page-nav-btn" onclick="show('svc-identity')">
-            <span class="dir">← Previous</span><span class="label">Identity Service</span>
+          <a class="page-nav-btn" onclick="show('user-keycloak')">
+            <span class="dir">← Previous</span><span class="label">Keycloak Setup</span>
           </a>
           <a class="page-nav-btn right" onclick="show('api-catalog')">
-            <span class="dir">Next →</span><span class="label">Catalog API</span>
+            <span class="dir">Next →</span><span class="label">Inventory API</span>
           </a>
         </div>
       </article>
 
       <!-- ════════════════════════════════════════════════════════════
-     CATALOG API
+     INVENTORY API
      ════════════════════════════════════════════════════════════ -->
-      <article class="page" id="page-api-catalog" data-title="Catalog API" data-section="API Reference">
-        <div class="breadcrumb"><span>Docs</span> › <span>API Reference</span> › Catalog API</div>
-        <h1>Catalog API <small style="font-size:14px;color:var(--subtle);font-weight:400">:8001</small></h1>
+      <article class="page" id="page-api-catalog" data-title="Inventory API" data-section="API Reference">
+        <div class="breadcrumb"><span>Docs</span> › <span>API Reference</span> › Inventory API</div>
+        <h1>Inventory API <small style="font-size:14px;color:var(--subtle);font-weight:400">:8001</small></h1>
 
         <h2>Datasets</h2>
         <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets</code>
@@ -3145,11 +3769,55 @@ curl -H "X-API-Key: dev-my-test-key" ...</code></pre>
         <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets/{id}</code>
           <p>Get dataset by ID.</p>
         </div>
-        <div class="endpoint"><span class="badge badge-patch">PATCH</span><code>/api/v1/datasets/{id}</code>
-          <p>Partial update.</p>
+        <div class="endpoint"><span class="badge badge-put">PUT</span><code>/api/v1/datasets/{id}</code>
+          <p>Replace all fields of a dataset.</p>
         </div>
         <div class="endpoint"><span class="badge badge-delete">DELETE</span><code>/api/v1/datasets/{id}</code>
-          <p>Soft-delete a dataset.</p>
+          <p>Soft-delete a dataset and its distributions.</p>
+        </div>
+
+        <h2>Dataset semantic types</h2>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets/{id}/semantic-context</code>
+          <p>Semantic types and vocabulary context derived from the dataset's published logical models. See
+            <a onclick="show('model-semantic')">Semantic Types</a>.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/datasets/{id}/semantic-tags</code>
+          <p>Accept a semantic type tag (AI-recommended or manual) directly on the dataset.</p>
+        </div>
+        <div class="endpoint"><span
+            class="badge badge-delete">DELETE</span><code>/api/v1/datasets/{id}/semantic-tags/{tagId}</code>
+          <p>Remove a previously accepted semantic tag.</p>
+        </div>
+        <div class="endpoint"><span
+            class="badge badge-post">POST</span><code>/api/v1/datasets/{id}/recommend-semantic-context</code>
+          <p>AI semantic type recommendations for the dataset (proxies the ai-service).</p>
+        </div>
+
+        <h2>Dataset ownership &amp; audit</h2>
+        <div class="endpoint"><span class="badge badge-put">PUT</span><code>/api/v1/datasets/{id}/owner</code>
+          <p>Assign a data owner to an unowned dataset. Body: <code>{"userId":"..."}</code>. Use the transfer
+            workflow if the dataset is already owned.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets/{id}/history</code>
+          <p>Reverse-chronological, paginated audit log for the dataset.</p>
+        </div>
+        <div class="endpoint"><span
+            class="badge badge-post">POST</span><code>/api/v1/datasets/{id}/ownership-proposals</code>
+          <p>Propose transferring ownership to another user. Body: <code>{"proposedOwnerId":"..."}</code>. The current
+            owner must approve.</p>
+        </div>
+        <div class="endpoint"><span
+            class="badge badge-post">POST</span><code>/api/v1/datasets/{id}/ownership-proposals/{proposalId}/approve</code>
+          <p>Approve a pending proposal (current owner or admin); updates the dataset's owner.</p>
+        </div>
+        <div class="endpoint"><span
+            class="badge badge-post">POST</span><code>/api/v1/datasets/{id}/ownership-proposals/{proposalId}/reject</code>
+          <p>Reject a pending proposal (current owner or admin).</p>
+        </div>
+        <div class="endpoint"><span
+            class="badge badge-get">GET</span><code>/api/v1/datasets/{id}/ownership-proposals/pending</code>
+          <p>The current PENDING proposal, or <code>204</code> if none. See
+            <a onclick="show('model-governance')">Governance &amp; Audit</a>.</p>
         </div>
 
         <h2>Data Products</h2>
@@ -3191,6 +3859,13 @@ curl -H "X-API-Key: dev-my-test-key" ...</code></pre>
         <div class="endpoint"><span
             class="badge badge-get">GET</span><code>/api/v1/vocabularies/{id}/concepts/search</code>
           <p>Search concepts. Query: <code>q=price&amp;limit=20</code>.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/vocabularies/translate</code>
+          <p>Translate one concept IRI to a human-readable label. Query: <code>iri=&lt;concept-iri&gt;</code>.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/vocabularies/translate</code>
+          <p>Batch-translate IRIs to labels. Body: a JSON array of IRIs. Returns an IRI→label map. The UI uses this
+            to render labels instead of raw IRIs.</p>
         </div>
         <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/catalogs/{id}/export</code>
           <p>Export as DCAT JSON-LD. Set <code>Accept: application/ld+json</code>.</p>
@@ -3243,7 +3918,7 @@ curl -H "X-API-Key: dev-my-test-key" ...</code></pre>
 
         <div class="page-nav">
           <a class="page-nav-btn" onclick="show('api-catalog')">
-            <span class="dir">← Previous</span><span class="label">Catalog API</span>
+            <span class="dir">← Previous</span><span class="label">Inventory API</span>
           </a>
           <a class="page-nav-btn right" onclick="show('api-lineage')">
             <span class="dir">Next →</span><span class="label">Lineage API</span>
@@ -3344,6 +4019,15 @@ curl -H "X-API-Key: dev-my-test-key" ...</code></pre>
         </div>
         <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/admin/embeddings/refresh</code>
           <p>Re-embed all documents. Admin only.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/classify/elements</code>
+          <p>Classify data elements by sensitivity (<code>PUBLIC</code>…<code>HIGH_CONFIDENTIAL</code>). Body:
+            <code>{"elements":[{"elementId":"...","name":"...","logicalType":"...","vocabConceptLabels":[...]}]}</code>.
+          </p>
+        </div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/recommend-semantic-context</code>
+          <p>Recommend semantic types for a dataset from its metadata. Body includes <code>title</code>,
+            <code>keywords</code>, <code>elementNames</code>, <code>currentVocabLabels</code>.</p>
         </div>
 
         <div class="page-nav">
@@ -3554,6 +4238,139 @@ docker compose --profile ai up -d</code></pre>
           <a class="page-nav-btn" onclick="show('deploy-compose')">
             <span class="dir">← Previous</span><span class="label">Docker Compose</span>
           </a>
+          <a class="page-nav-btn right" onclick="show('deploy-k8s-raw')">
+            <span class="dir">Next →</span><span class="label">Kubernetes (Raw Manifests)</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     KUBERNETES — RAW MANIFESTS
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-deploy-k8s-raw" data-title="Kubernetes (Raw Manifests)" data-section="Deployment">
+        <div class="breadcrumb"><span>Docs</span> › <span>Deployment</span> › Kubernetes (Raw Manifests)</div>
+        <h1>Kubernetes (Raw Manifests)</h1>
+        <p>Raw Kubernetes manifests live under <code>infra/kubernetes/</code>. Fourteen numbered YAML files cover
+          everything from namespace creation to ingress rules. <code>deploy.sh</code> applies them in dependency order
+          via <code>kubectl</code> and <code>envsubst</code>.</p>
+
+        <h2>Prerequisites</h2>
+        <table>
+          <thead>
+            <tr><th>Tool</th><th>Purpose</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>kubectl</code></td><td>Cluster access (configured kubeconfig)</td></tr>
+            <tr><td><code>envsubst</code></td><td>Image registry injection — <code>apt install gettext-base</code></td></tr>
+            <tr><td><code>curl</code>, <code>jq</code></td><td>Health checks and seed script</td></tr>
+            <tr><td>NGINX Ingress</td><td><code>microk8s enable ingress</code> or install via upstream manifest</td></tr>
+          </tbody>
+        </table>
+
+        <h2>1. Build and push images</h2>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre><code class="language-bash">export IMAGE_REGISTRY=localhost:32000/   # MicroK8s built-in registry
+
+for svc in inventory-service harvest-service lineage-service \
+           search-service ai-service identity-service; do
+  docker build -t ${IMAGE_REGISTRY}odin/${svc}:latest services/${svc}/
+  docker push ${IMAGE_REGISTRY}odin/${svc}:latest
+done</code></pre>
+        </div>
+
+        <h2>2. Deploy</h2>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre><code class="language-bash">IMAGE_REGISTRY=localhost:32000/ ./infra/kubernetes/deploy.sh</code></pre>
+        </div>
+        <p>The script applies all manifests in order, then waits for StatefulSets, Jobs, and Deployments to reach ready state before exiting.</p>
+
+        <table>
+          <thead>
+            <tr><th>Flag</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>--dry-run</code></td><td>Render manifests via <code>envsubst</code> without applying — review before committing</td></tr>
+            <tr><td><code>--delete</code></td><td>Tear down all resources; PVCs are preserved to protect data</td></tr>
+          </tbody>
+        </table>
+
+        <h2>3. Update /etc/hosts</h2>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre><code class="language-bash">NODE_IP=$(kubectl get nodes \
+  -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+echo "$NODE_IP  catalog.local manage.catalog.local api.catalog.local" \
+  | sudo tee -a /etc/hosts</code></pre>
+        </div>
+
+        <h2>4. Load sample data</h2>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre><code class="language-bash">./infra/kubernetes/seed.sh --namespace odin-catalog</code></pre>
+        </div>
+        <p>The seed script establishes <code>kubectl port-forward</code> tunnels to each service, waits for readiness,
+          then delegates to <code>infra/seed/seed.sh</code> — the same Meridian Capital financial dataset scenario used
+          with Docker Compose.</p>
+
+        <table>
+          <thead>
+            <tr><th>Flag</th><th>Default</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>--namespace</code></td><td><code>odin-catalog</code></td><td>Kubernetes namespace</td></tr>
+            <tr><td><code>--api-key</code></td><td><code>dev-local</code></td><td><code>X-API-Key</code> header value</td></tr>
+            <tr><td><code>--context</code></td><td>(current)</td><td><code>kubectl</code> context to use</td></tr>
+            <tr><td><code>--timeout</code></td><td><code>120</code></td><td>Seconds to wait per service health check</td></tr>
+          </tbody>
+        </table>
+
+        <div class="callout info">
+          <span class="callout-icon">ℹ</span>
+          <div><strong>Port collision:</strong> Stop any local Docker Compose stack before running <code>seed.sh</code>.
+            It uses ports 8001–8004 for port-forwarding.</div>
+        </div>
+
+        <h2>5. Access</h2>
+        <table>
+          <thead>
+            <tr><th>App</th><th>URL</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Consumer (discovery)</td><td><code>http://catalog.local</code></td></tr>
+            <tr><td>Producer (management)</td><td><code>http://manage.catalog.local</code></td></tr>
+            <tr><td>API health</td><td><code>http://api.catalog.local/inventory/actuator/health</code></td></tr>
+          </tbody>
+        </table>
+
+        <h2>Manifest inventory</h2>
+        <table>
+          <thead>
+            <tr><th>File</th><th>Contents</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>00-namespace.yaml</code></td><td>Namespace with <code>pod-security.kubernetes.io/enforce: privileged</code></td></tr>
+            <tr><td><code>01-serviceaccount.yaml</code></td><td>Default service account</td></tr>
+            <tr><td><code>02-secrets.yaml</code></td><td>PostgreSQL passwords, MinIO credentials, Keycloak admin password</td></tr>
+            <tr><td><code>03-configmaps.yaml</code></td><td>Common Spring config, Kafka topic script, OpenSearch index mapping, Keycloak realm</td></tr>
+            <tr><td><code>10-postgres.yaml</code></td><td>Five StatefulSets: inventory, harvest, lineage (Apache AGE), identity, ai (pgvector)</td></tr>
+            <tr><td><code>11-kafka.yaml</code></td><td>KRaft-mode Kafka StatefulSet (no ZooKeeper)</td></tr>
+            <tr><td><code>12-opensearch.yaml</code></td><td>OpenSearch with privileged sysctl init container (<code>vm.max_map_count=262144</code>)</td></tr>
+            <tr><td><code>13-minio.yaml</code></td><td>MinIO Deployment for harvest snapshots</td></tr>
+            <tr><td><code>14-redis.yaml</code></td><td>Redis for Quartz scheduler clustering</td></tr>
+            <tr><td><code>15-keycloak.yaml</code></td><td>Keycloak 24 with realm auto-import</td></tr>
+            <tr><td><code>20-backend-services.yaml</code></td><td>Six Spring Boot Deployments + ClusterIP Services</td></tr>
+            <tr><td><code>21-frontends.yaml</code></td><td>Producer and Consumer frontend Deployments + Services</td></tr>
+            <tr><td><code>22-ingress.yaml</code></td><td>NGINX Ingress for all three virtual hosts</td></tr>
+            <tr><td><code>30-jobs.yaml</code></td><td>One-shot Jobs: Kafka topic creation and OpenSearch index initialisation</td></tr>
+          </tbody>
+        </table>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('deploy-env')">
+            <span class="dir">← Previous</span><span class="label">Environment Variables</span>
+          </a>
           <a class="page-nav-btn right" onclick="show('deploy-k8s')">
             <span class="dir">Next →</span><span class="label">Kubernetes (Helm)</span>
           </a>
@@ -3561,33 +4378,49 @@ docker compose --profile ai up -d</code></pre>
       </article>
 
       <!-- ════════════════════════════════════════════════════════════
-     KUBERNETES
+     KUBERNETES — HELM
      ════════════════════════════════════════════════════════════ -->
       <article class="page" id="page-deploy-k8s" data-title="Kubernetes (Helm)" data-section="Deployment">
         <div class="breadcrumb"><span>Docs</span> › <span>Deployment</span> › Kubernetes (Helm)</div>
-        <h1>Kubernetes (Helm)</h1>
-        <p>Helm charts are provided under <code>infra/helm/charts/</code> for each service. A top-level umbrella chart
-          is planned for GA.</p>
+        <h1>Kubernetes (Helm / MicroK8s)</h1>
+        <p>A Helm umbrella chart is provided under <code>infra/helm/</code> for clusters managed with Helm 3.
+          A MicroK8s-specific <code>deploy.sh</code> under <code>infra/microk8s/</code> wraps the Helm install with
+          sensible single-node defaults.</p>
 
-        <div class="callout warn">
-          <span class="callout-icon">⚠</span>
-          <div>Kubernetes deployment is in early stages. The Helm charts are functional but not hardened for production.
-            Use Docker Compose for evaluation and development.</div>
+        <h2>MicroK8s quick deploy</h2>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre><code class="language-bash"># Full resources
+./infra/microk8s/deploy.sh
+
+# Reduced resources for machines with &lt; 16 GB RAM
+./infra/microk8s/deploy.sh --reduced-resources</code></pre>
         </div>
 
+        <h2>Standard Helm install / upgrade</h2>
         <div class="code-block">
-          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
-          </div>
-          <pre><code class="language-bash"># Install inventory-service chart
-helm install odin-catalog infra/helm/charts/inventory-service \
-  --namespace odin --create-namespace \
-  --set postgresql.password=changeme \
-  --set kafka.brokers=kafka:9092</code></pre>
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre><code class="language-bash"># Install
+helm install odin infra/helm \
+  --namespace odin-catalog --create-namespace \
+  -f infra/microk8s/values.yaml
+
+# Upgrade after image rebuild
+helm upgrade odin infra/helm \
+  --namespace odin-catalog \
+  -f infra/microk8s/values.yaml</code></pre>
+        </div>
+
+        <div class="callout info">
+          <span class="callout-icon">ℹ</span>
+          <div>See <code>docs/microk8s-deployment.md</code> for the full MicroK8s setup guide — snap installation,
+            addon enablement (<code>dns</code>, <code>storage</code>, <code>ingress</code>, <code>registry</code>),
+            and image registry configuration.</div>
         </div>
 
         <div class="page-nav">
-          <a class="page-nav-btn" onclick="show('deploy-env')">
-            <span class="dir">← Previous</span><span class="label">Environment Variables</span>
+          <a class="page-nav-btn" onclick="show('deploy-k8s-raw')">
+            <span class="dir">← Previous</span><span class="label">Kubernetes (Raw Manifests)</span>
           </a>
           <a class="page-nav-btn right" onclick="show('contrib-dev')">
             <span class="dir">Next →</span><span class="label">Local Development</span>
@@ -3685,8 +4518,9 @@ docker compose up -d inventory-service</code></pre>
       'model-overview', 'model-dcat', 'model-dprod', 'model-csvw', 'model-logical', 'model-vocab', 'model-vocab-ai', 'model-lineage',
       'erd',
       'svc-catalog', 'svc-harvest', 'svc-lineage', 'svc-search', 'svc-ai', 'svc-identity',
+      'user-mgmt', 'user-invite', 'user-keycloak',
       'api-auth', 'api-catalog', 'api-harvest', 'api-lineage', 'api-search', 'api-ai',
-      'deploy-compose', 'deploy-env', 'deploy-k8s',
+      'deploy-compose', 'deploy-env', 'deploy-k8s-raw', 'deploy-k8s',
       'contrib-dev', 'contrib-guide'
     ];
 
