@@ -4232,6 +4232,12 @@ docker compose --profile ai up -d</code></pre>
             <td><code>us-east-1</code></td>
             <td>AWS region for Glue</td>
           </tr>
+          <tr>
+            <td><code>JAVA_TOOL_OPTIONS</code></td>
+            <td>All Java services</td>
+            <td>(empty)</td>
+            <td>JVM options injected at startup. Set to <code>-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005</code> to enable remote debugging on all services. See <a onclick="show('contrib-dev')" style="cursor:pointer">Local Development</a> for port mappings.</td>
+          </tr>
         </table>
 
         <div class="page-nav">
@@ -4459,6 +4465,36 @@ cd ../consumer  && pnpm install && pnpm dev   # http://localhost:3001</code></pr
           <pre><code class="language-bash"># Always build then up — `restart` reuses the old image
 docker compose build inventory-service
 docker compose up -d inventory-service</code></pre>
+        </div>
+
+        <h2>Remote debugging</h2>
+        <p>All Java services support JDWP remote debugging via the standard <code>JAVA_TOOL_OPTIONS</code> env var — no
+          rebuild required. Enable it in <code>.env</code>:</p>
+        <div class="code-block">
+          <div class="code-header"><span>.env</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre><code class="language-bash">JAVA_TOOL_OPTIONS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005</code></pre>
+        </div>
+        <p>Then restart the services you want to debug (<code>docker compose up -d</code>). Each service listens on port
+          5005 inside its container, exposed on a unique host port:</p>
+        <table>
+          <tr><th>Service</th><th>HTTP port</th><th>Debug host port</th></tr>
+          <tr><td><code>inventory-service</code></td><td>8001</td><td><strong>5001</strong></td></tr>
+          <tr><td><code>harvest-service</code></td><td>8002</td><td><strong>5002</strong></td></tr>
+          <tr><td><code>lineage-service</code></td><td>8003</td><td><strong>5003</strong></td></tr>
+          <tr><td><code>search-service</code></td><td>8004</td><td><strong>5004</strong></td></tr>
+          <tr><td><code>ai-service</code></td><td>8005</td><td><strong>5005</strong></td></tr>
+          <tr><td><code>identity-service</code></td><td>8006</td><td><strong>5006</strong></td></tr>
+        </table>
+        <p>In IntelliJ IDEA: <strong>Run → Edit Configurations → + → Remote JVM Debug</strong>, set
+          <strong>Host</strong> to <code>localhost</code> and <strong>Port</strong> to the service's debug host port
+          above. In VS Code, add a <code>launch.json</code> entry with type <code>java</code>,
+          <code>request: attach</code>, and the corresponding port.
+        </p>
+        <div class="callout tip">
+          <span class="callout-icon">✓</span>
+          <div>The JVM prints <code>Listening for transport dt_socket at address: 5005</code> on startup when debugging is
+            active. Leave <code>JAVA_TOOL_OPTIONS=</code> (empty) in <code>.env</code> to disable it with zero overhead.
+          </div>
         </div>
 
         <div class="page-nav">

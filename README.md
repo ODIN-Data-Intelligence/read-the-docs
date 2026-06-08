@@ -75,7 +75,7 @@ ODIN Catalog is an open-source data catalog built on W3C and OMG standards. It b
 - **Live lineage graph** — OpenLineage events and SQL DDL are parsed into an Apache AGE property graph queryable by Cypher.
 - **Data product governance** — the DPROD standard gives every dataset a business owner, lifecycle stage, and access policy.
 - **AI-powered Q&A** — a Spring AI RAG pipeline runs over your metadata corpus using Ollama (local) or OpenAI.
-- **AI metadata enrichment** — per-element classification, description, and vocabulary concept recommendations, all owner-reviewed before acceptance.
+- **AI metadata enrichment** — per-element classification, description, and vocabulary concept recommendations, all owner-reviewed before acceptance. Vocabulary concept chips are individually selectable — owners can accept a subset rather than all-or-nothing.
 - **ODRL terms of use** — access-level policy (OPEN → HIGHLY\_RESTRICTED) derived automatically from element classifications and vocabulary concepts; displayed to consumers, governed by data owners.
 - **Accountable data ownership** — role-based dataset ownership with a proposal-and-approval transfer workflow and a full audit history. The governance dashboard surfaces pending tasks and an activity feed for every user.
 - **Zero lock-in** — all metadata is exportable as DCAT 3.0 JSON-LD.
@@ -645,12 +645,16 @@ curl -X POST http://localhost:8003/api/v1/lineage \
 **Query the lineage graph:**
 
 ```bash
-# Upstream lineage, 4 hops
-curl "http://localhost:8003/api/v1/datasets/REGULATORY_DB.BCBS239/RISK_AGGREGATION/lineage?direction=upstream&depth=4" \
+# Step 1 — resolve namespace/name to a lineage UUID
+LINEAGE_ID=$(curl -s "http://localhost:8003/api/v1/datasets/lookup?namespace=REGULATORY_DB.BCBS239&name=RISK_AGGREGATION" \
+  -H "X-API-Key: dev-local" | jq -r .id)
+
+# Step 2 — upstream lineage, 4 hops (using lineage UUID)
+curl "http://localhost:8003/api/v1/datasets/$LINEAGE_ID/lineage?direction=upstream&depth=4" \
   -H "X-API-Key: dev-local"
 
 # Downstream impact analysis
-curl "http://localhost:8003/api/v1/datasets/TRADING_DB.BLOTTER/TRADE_BLOTTER/impact" \
+curl "http://localhost:8003/api/v1/datasets/$LINEAGE_ID/impact" \
   -H "X-API-Key: dev-local"
 ```
 
@@ -1040,7 +1044,7 @@ curl -H "X-API-Key: dev-local" http://localhost:8001/api/v1/datasets
 | `POST` | `/api/v1/logical-models/{id}/recommend-classifications` | Bulk classification recommendation job for all elements in a model |
 | `GET` | `/api/v1/logical-models/recommend-classifications/jobs/{jobId}` | Poll bulk classification job status |
 | `POST` | `/api/v1/logical-data-elements/{id}/recommend-vocab-concepts` | AI-suggested SKOS concept mappings (up to 5) for an element |
-| `POST` | `/api/v1/logical-data-elements/{id}/accept-vocab-concepts` | Accept recommendations — creates VocabMapping rows |
+| `POST` | `/api/v1/logical-data-elements/{id}/accept-vocab-concepts` | Accept recommendations — optional body `{"iris":[...]}` accepts only selected concepts; without body, accepts all; all recommendations cleared regardless |
 | `POST` | `/api/v1/logical-data-elements/{id}/reject-vocab-concepts` | Reject recommendations without creating mappings |
 | `POST` | `/api/v1/logical-models/{id}/recommend-vocab-concepts` | Bulk vocabulary concept recommendation job |
 | `GET` | `/api/v1/logical-models/recommend-vocab-concepts/jobs/{jobId}` | Poll bulk vocab recommendation job status |
@@ -1087,11 +1091,12 @@ curl -H "X-API-Key: dev-local" http://localhost:8001/api/v1/datasets
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/api/v1/lineage` | Ingest an OpenLineage RunEvent |
-| `GET` | `/api/v1/datasets/{ns}/{name}/lineage` | Graph traversal. Params: `direction`, `depth` |
-| `GET` | `/api/v1/datasets/{ns}/{name}/column-lineage` | Column-level lineage |
-| `GET` | `/api/v1/datasets/{ns}/{name}/impact` | Downstream impact analysis |
+| `GET` | `/api/v1/datasets/lookup?namespace=&name=` | Resolve namespace/name → lineage service UUID |
+| `GET` | `/api/v1/datasets/{id}/lineage` | Graph traversal by lineage UUID. Params: `direction`, `depth` |
+| `GET` | `/api/v1/datasets/{id}/impact` | Downstream impact analysis by lineage UUID |
+| `GET` | `/api/v1/catalog-datasets/{catalogId}/lineage-identity` | Resolve catalog UUID → lineage UUID, namespace, name |
+| `PUT` | `/api/v1/datasets/{namespace}/{name}/catalog-link` | Link a catalog dataset UUID to a lineage dataset |
 | `POST` | `/api/v1/ddl/submit` | Submit DDL for Calcite parsing |
-| `GET` | `/api/v1/jobs/{ns}/{name}/runs` | Run history. Filter by `state`, `start`, `end` |
 
 ---
 
@@ -1186,6 +1191,7 @@ docker compose up -d inventory-service
 | `AWS_ACCESS_KEY_ID` | harvest | — | AWS credentials for Glue connector |
 | `AWS_SECRET_ACCESS_KEY` | harvest | — | AWS credentials for Glue connector |
 | `AWS_REGION` | harvest | `us-east-1` | AWS region for Glue |
+| `JAVA_TOOL_OPTIONS` | All Java services | (empty) | JVM options injected at startup. Set to `-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005` to enable remote debugging. See [Local Development](#local-development) for port mappings. |
 
 ---
 
@@ -1371,6 +1377,27 @@ cd frontend/shared && pnpm install && pnpm build
 cd ../producer  && pnpm install && pnpm dev   # http://localhost:3000
 cd ../consumer  && pnpm install && pnpm dev   # http://localhost:3001
 ```
+
+**Remote debugging:**
+
+Enable JDWP on all Java services by setting `JAVA_TOOL_OPTIONS` in `.env` — no rebuild required:
+
+```dotenv
+JAVA_TOOL_OPTIONS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+```
+
+Then restart the services (`docker compose up -d`). Each service exposes a unique debug port on the host:
+
+| Service | HTTP port | Debug host port |
+|---|---|---|
+| `inventory-service` | 8001 | **5001** |
+| `harvest-service` | 8002 | **5002** |
+| `lineage-service` | 8003 | **5003** |
+| `search-service` | 8004 | **5004** |
+| `ai-service` | 8005 | **5005** |
+| `identity-service` | 8006 | **5006** |
+
+Connect your IDE to `localhost:<debug-port>`. The JVM logs `Listening for transport dt_socket at address: 5005` on startup when active. Leave `JAVA_TOOL_OPTIONS=` (empty) to disable with zero overhead.
 
 ---
 
