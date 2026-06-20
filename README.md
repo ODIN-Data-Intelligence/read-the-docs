@@ -31,7 +31,7 @@
   - [Terms of Use (ODRL)](#terms-of-use-odrl)
   - [OpenLineage](#openlineage)
 - [Capabilities Matrix](capabilities.md) — full feature inventory with status (available / partial / planned)
-- [Database ERDs](erd.md) — full schema diagrams for all five databases
+- [Database ERDs](erd.md) — full schema diagrams for all six databases
 - [Services](#services-1)
   - [Inventory Service](#inventory-service)
   - [Harvest Service](#harvest-service)
@@ -39,6 +39,7 @@
   - [Search Service](#search-service)
   - [AI Service](#ai-service)
   - [Identity Service](#identity-service)
+  - [Policy Service](#policy-service)
 - [Authentication & User Management](#authentication--user-management)
   - [Roles](#roles)
   - [Default Users](#default-users)
@@ -51,6 +52,7 @@
   - [Lineage API](#lineage-api)
   - [Search API](#search-api)
   - [AI API](#ai-api)
+  - [Policy API](#policy-api)
 - [Deployment](#deployment)
   - [Docker Compose](#docker-compose)
   - [Environment Variables](#environment-variables)
@@ -75,8 +77,9 @@ ODIN Catalog is an open-source data catalog built on W3C and OMG standards. It b
 - **Live lineage graph** — OpenLineage events and SQL DDL are parsed into an Apache AGE property graph queryable by Cypher.
 - **Data product governance** — the DPROD standard gives every dataset a business owner, lifecycle stage, and access policy.
 - **AI-powered Q&A** — a Spring AI RAG pipeline runs over your metadata corpus using Ollama (local) or OpenAI.
-- **AI metadata enrichment** — per-element classification, description, and vocabulary concept recommendations, all owner-reviewed before acceptance. Vocabulary concept chips are individually selectable — owners can accept a subset rather than all-or-nothing.
-- **ODRL terms of use** — access-level policy (OPEN → HIGHLY\_RESTRICTED) derived automatically from element classifications and vocabulary concepts; displayed to consumers, governed by data owners.
+- **AI metadata enrichment** — per-element classification, description, vocabulary concept, and PII/direct-identifier recommendations, all owner-reviewed before acceptance. Vocabulary concept chips are individually selectable; PII and direct-identifier flags are AI-detected using W3C DPV-PD vocabulary IRIs and field name heuristics.
+- **FCRA-aware policy derivation** — when any published logical model element is flagged as personal information or a direct identifier, the `HAS_PII_ELEMENTS` signal fires and ODRL terms are automatically strengthened with POLICY_STRICT rules (restricted distribution, audit obligation).
+- **ODRL terms of use + ODRE enforcement** — access-level policy (OPEN → HIGHLY\_RESTRICTED) derived automatically from element classifications and vocabulary concepts; the dedicated policy-service evaluates ODRL policies at request time using the ODRE enforcement algorithm, returning machine-readable access decisions.
 - **Accountable data ownership** — role-based dataset ownership with a proposal-and-approval transfer workflow and a full audit history. The governance dashboard surfaces pending tasks and an activity feed for every user.
 - **Zero lock-in** — all metadata is exportable as DCAT 3.0 JSON-LD.
 
@@ -90,7 +93,9 @@ ODIN Catalog is an open-source data catalog built on W3C and OMG standards. It b
 | **OpenLineage** | Linux Foundation | Job/Run/Dataset lineage events ingested via REST |
 | **FIBO** | EDM Council | Pre-loaded financial ontology vocabulary (FND, FBC, SEC, MD) |
 | **SKOS** | W3C | Mapping properties: exactMatch, closeMatch, relatedMatch |
+| **DPV** | W3C | Data Privacy Vocabulary — personal data categories, processing purposes, and legal bases. DPV-PD concept IRIs drive AI-based PII and direct-identifier detection on logical model elements |
 | **ODRL** | W3C | Terms of use policies — permissions, prohibitions, obligations derived from element classifications and vocabulary concepts |
+| **ODRE** | Academic (Cimmino et al., 2025) | Open Digital Rights Enforcement — Algorithm 1 evaluation engine; policy-service implements A-Level (static ODRL) and B1-Level (runtime variable injection) |
 
 > **Alpha notice:** ODIN is currently in private alpha. APIs and database schemas may change between releases. Not recommended for production workloads yet.
 
@@ -223,7 +228,7 @@ All runtime configuration is driven by environment variables. Copy `.env.example
 
 ### Overview
 
-ODIN follows Domain-Driven Design with a database-per-service pattern. Six Spring Boot 3.3 microservices communicate via Kafka events. Traefik routes external HTTP traffic.
+ODIN follows Domain-Driven Design with a database-per-service pattern. Seven Spring Boot 3.3 microservices communicate via Kafka events. Traefik routes external HTTP traffic.
 
 ```
 Browser / CLI
@@ -232,14 +237,15 @@ Browser / CLI
 Traefik (port 80/443)
     ├── catalog.local/          → consumer-frontend (nginx, port 3001)
     ├── manage.catalog.local/   → producer-frontend (nginx, port 3000)
-    └── api.catalog.local/      → services (ports 8001–8006)
+    └── api.catalog.local/      → services (ports 8001–8007)
             │
             ├── inventory-service  :8001  PostgreSQL :5433
-            ├── harvest-service  :8002  PostgreSQL :5434 + MinIO :9000
-            ├── lineage-service  :8003  PostgreSQL+AGE :5435
-            ├── search-service   :8004  OpenSearch :9200
-            ├── ai-service       :8005  PostgreSQL+pgvector :5437
-            └── identity-service :8006  PostgreSQL :5436 + Keycloak :8180
+            ├── harvest-service    :8002  PostgreSQL :5434 + MinIO :9000
+            ├── lineage-service    :8003  PostgreSQL+AGE :5435
+            ├── search-service     :8004  OpenSearch :9200
+            ├── ai-service         :8005  PostgreSQL+pgvector :5437
+            ├── identity-service   :8006  PostgreSQL :5436 + Keycloak :8180
+            └── policy-service     :8007  PostgreSQL :5438
                     │
                     └─── Apache Kafka :9092 (KRaft, no ZooKeeper)
 ```
@@ -263,6 +269,7 @@ Traefik (port 80/443)
 | **search-service** | 8004 | OpenSearch 2.x | Full-text + semantic indexing, FIBO facets, autocomplete suggestions |
 | **ai-service** | 8005 | PostgreSQL + pgvector | Spring AI RAG pipeline, embeddings, SSE chat streaming, Ollama / OpenAI |
 | **identity-service** | 8006 | PostgreSQL 16 | Keycloak OAuth2/OIDC, role-based access (Administrator, Data Owner, Steward, Governance), user provisioning with Keycloak sync, API keys, tenant management |
+| **policy-service** | 8007 | PostgreSQL 16 | ODRL policy registry and ODRE enforcement engine (PDP). Evaluates A-Level and B1-Level ODRL policies at request time; syncs policies from dataset change events via Kafka; persists evaluation log. |
 
 ---
 
@@ -272,11 +279,13 @@ All inter-service communication uses Kafka with an envelope schema that carries 
 
 | Topic | Producer | Consumers | Compacted |
 |---|---|---|---|
-| `inventory.datasets.changes` | inventory-service | search-service, ai-service | Yes |
+| `inventory.datasets.changes` | inventory-service | search-service, ai-service, policy-service | Yes |
 | `inventory.data-products.changes` | inventory-service | search-service, ai-service | Yes |
 | `harvest.entities.discovered` | harvest-service | inventory-service | No |
 | `harvest.ddl.discovered` | harvest-service | lineage-service | No |
 | `lineage.graph.updated` | lineage-service | search-service | No |
+| `policy.records.changes` | policy-service | — (reserved for future PEPs) | No |
+| `policy.evaluations.completed` | policy-service | API gateway / consumer (planned) | No |
 
 **Event envelope:**
 
@@ -432,6 +441,12 @@ A **LogicalModel** belongs to a Dataset and provides the business-oriented view 
 | `physicalColumnIds` | UUID[] | IDs of bound `csvw_columns` rows (FK lives on the column side) |
 | `isIdentifier` | boolean | True if this element forms part of the logical primary key |
 | `isNullable` | boolean | Whether the business concept permits absence of a value |
+| `isPersonalInformation` | boolean | True if this element holds personal data about a natural person (DPV-PD category match or field name heuristic) |
+| `isDirectIdentifier` | boolean | True if this element directly identifies a natural person (name, email, SSN, LEI for sole traders, etc.) |
+| `recommendedIsPersonalInformation` | boolean? | AI-suggested value pending data owner review; cleared on accept/reject |
+| `recommendedIsDirectIdentifier` | boolean? | AI-suggested value pending data owner review; cleared on accept/reject |
+| `piiRecommendationReasoning` | string? | One-sentence rationale for the AI PII/identifier recommendation |
+| `piiRecommendedAt` | timestamp? | When the current pending PII recommendation was generated |
 
 **Bind a physical column:**
 
@@ -462,13 +477,42 @@ curl -s -X POST \
   -H "X-API-Key: dev-local"
 ```
 
+**AI PII and direct-identifier recommendation:** For each element the AI service detects whether the element holds personal data (`isPersonalInformation`) or directly identifies a natural person (`isDirectIdentifier`). Detection uses DPV-PD and schema.org vocabulary concept IRIs already on the element, plus field name and dataset keyword heuristics. Results are stored as pending `recommendedIs*` fields and surfaced in the Model tab for data owner review.
+
+```bash
+# Request PII/identifier recommendation for one element
+curl -s -X POST \
+  http://localhost:8001/api/v1/logical-data-elements/{elementId}/recommend-pii \
+  -H "X-API-Key: dev-local"
+
+# Accept the recommendation
+curl -s -X POST \
+  http://localhost:8001/api/v1/logical-data-elements/{elementId}/accept-pii \
+  -H "X-API-Key: dev-local"
+
+# Reject the recommendation
+curl -s -X POST \
+  http://localhost:8001/api/v1/logical-data-elements/{elementId}/reject-pii \
+  -H "X-API-Key: dev-local"
+
+# Bulk — all elements in a model
+curl -s -X POST \
+  http://localhost:8001/api/v1/logical-models/{modelId}/recommend-pii \
+  -H "X-API-Key: dev-local"
+# → {"jobId": "...", "status": "RUNNING"}
+
+# Poll job status
+curl -s http://localhost:8001/api/v1/logical-models/recommend-pii/jobs/{jobId} \
+  -H "X-API-Key: dev-local"
+```
+
 **Auto-scaffold from harvest:** When a harvest run discovers columns for a dataset that has no published LogicalModel, ODIN automatically generates a *draft* LogicalModel with one `LogicalDataElement` per `CSVWColumn`. Each harvested column has its `logicalDataElementId` set to the newly created element, and its `logicalType` is inferred from the source datatype.
 
 ---
 
 ### Vocabulary & FIBO
 
-ODIN ships with six system vocabularies pre-loaded. Additional RDF vocabularies can be registered at any time.
+ODIN ships with seven system vocabularies pre-loaded. Additional RDF vocabularies can be registered at any time.
 
 **Pre-loaded vocabularies:**
 
@@ -480,6 +524,7 @@ ODIN ships with six system vocabularies pre-loaded. Additional RDF vocabularies 
 | FIBO SEC | `fibo-sec` | financial | `https://spec.edmcouncil.org/fibo/ontology/SEC/` |
 | FIBO MD | `fibo-md` | financial | `https://spec.edmcouncil.org/fibo/ontology/MD/` |
 | SKOS | `skos` | general | `http://www.w3.org/2004/02/skos/core#` |
+| DPV / DPV-PD | `dpv` | privacy | `https://w3id.org/dpv#` / `https://w3id.org/dpv/pd#` |
 
 **SKOS match types:**
 
@@ -582,7 +627,8 @@ curl "http://localhost:8004/api/v1/search?fibo_concept=fibo-fnd-acc-cur%3ACurren
 ODIN derives an [ODRL](https://www.w3.org/TR/odrl-model/) terms-of-use policy for every dataset automatically — no manual authoring required. The policy is inferred from two signals already present in the catalog:
 
 1. **Element classifications** — the most restrictive accepted `classification` across all published logical model elements determines the access level.
-2. **Vocabulary concept mappings** — FIBO namespace prefixes (`fibo-fbc`, `fibo-sec`, `fibo-md`) and dataset keywords (`mifid`, `emir`, `gdpr`, `basel`, `finrep`) identify applicable regulatory frameworks.
+2. **Vocabulary concept mappings** — FIBO namespace prefixes (`fibo-fbc`, `fibo-sec`, `fibo-md`) and dataset keywords (`mifid`, `emir`, `gdpr`, `basel`, `finrep`, `fcra`) identify applicable regulatory frameworks.
+3. **PII element signals** — when any published element has `isPersonalInformation = true` or `isDirectIdentifier = true`, the `HAS_PII_ELEMENTS` signal fires. This triggers FCRA-style POLICY_STRICT rules: the derived ODRL policy gains a prohibition on distribution without explicit consent and an audit obligation, strengthening the base access level rules.
 
 **Access levels:**
 
@@ -617,6 +663,43 @@ curl -X DELETE http://localhost:8001/api/v1/datasets/{id}/terms-of-use/policy \
 **Accept pre-condition:** The "Accept Policy" button in the producer Governance tab is enabled only when every element in the published logical model has both an accepted `classification` and at least one vocabulary concept mapping. ODIN shows per-element readiness hints while conditions are unmet.
 
 **Consumer visibility:** The consumer discovery UI exposes a **Terms** tab on every dataset drawer, showing the access level badge, rule sections, applicable regulations as pills, and a collapsible ODRL JSON block for technical consumers.
+
+#### ODRE Policy Enforcement (policy-service)
+
+The **policy-service** (port 8007) is the platform's Policy Decision Point (PDP). It implements ODRE Algorithm 1 (Cimmino et al., *Computers & Security*, 2025) — a concrete enforcement layer on top of ODRL that produces machine-readable `UsageDecision` tuples at request time.
+
+**Policy levels supported:**
+
+| Level | Description |
+|---|---|
+| A-Level | Pure ODRL JSON-LD. Static constraint evaluation — dateTime, numeric, string comparisons. All policies generated by `TermsOfUseService` are A-Level. |
+| B1-Level | Variable injection: `[=varName]` placeholders resolved from the request `M` map at evaluation time. Use to inject caller role, caller ID, or any runtime value without embedding it in the stored policy. |
+
+**Register a policy (upsert):**
+
+```bash
+curl -X PUT http://localhost:8007/api/v1/policies/{datasetId} \
+  -H "X-API-Key: dev-local" -H "Content-Type: application/json" \
+  -d '{
+    "policyJson": "{\"@context\":\"http://www.w3.org/ns/odrl.jsonld\",\"@type\":\"Set\",\"uid\":\"urn:example\",\"permission\":[{\"target\":\"dataset:x\",\"action\":\"read\"}]}",
+    "policyLevel": "A"
+  }'
+```
+
+**Evaluate access (PDP call):**
+
+```bash
+curl -X POST http://localhost:8007/api/v1/policies/{datasetId}/evaluate \
+  -H "X-API-Key: dev-local" -H "Content-Type: application/json" \
+  -d '{"M": {"callerRole": "DATA_OWNER"}, "F": {}}'
+# → {"granted": true, "policyLevel": "A", "decisions": [{"action":"read","result":"true","delegated":false}]}
+```
+
+The `granted` field is `true` when the decision set contains a `(read, "true")` tuple (non-delegated permission). An empty decision set means all constraints failed — access denied.
+
+**Kafka sync:** policy-service subscribes to `inventory.datasets.changes`. When a dataset event carries a non-null `hasPolicy` field (set after a data owner accepts terms), the policy is automatically upserted into the policy registry — no manual `PUT` required.
+
+**Evaluation log:** Every `POST /evaluate` call is persisted to `evaluation_log` and a `PolicyEvaluationResultPayload` event is published to `policy.evaluations.completed` for downstream enforcement points.
 
 ---
 
@@ -847,6 +930,47 @@ The Keycloak realm (`datacatalog`) is auto-imported from `infra/keycloak/datacat
 
 ---
 
+### Policy Service
+
+**Port:** 8007 | **Database:** PostgreSQL 16 (port 5438)
+
+The policy-service is the platform's **Policy Decision Point (PDP)**. It holds the ODRL policy registry for all datasets and evaluates them on demand using an internal implementation of the ODRE enforcement algorithm (Cimmino et al., *Computers & Security*, 2025).
+
+**Responsibilities:**
+- Maintain a `policy_records` registry keyed by `(dataset_id, tenant_id)` — policies are automatically synced from `inventory.datasets.changes` Kafka events when a data owner accepts terms
+- Evaluate ODRL policies at request time via `POST /api/v1/policies/{datasetId}/evaluate`, running Algorithm 1 against the A-Level or B1-Level policy
+- Persist an `evaluation_log` for every evaluation request
+- Publish `PolicyEvaluationResultPayload` to the `policy.evaluations.completed` Kafka topic so downstream Policy Enforcement Points (API gateway, consumer layer) can act on decisions without coupling to policy logic
+
+**ODRE Algorithm 1 (internal engine):**
+
+The internal `OdreEngine` parses ODRL JSON-LD with Jackson and walks the `permission`, `prohibition`, and `obligation` rule arrays. For each rule it evaluates `constraint` triples using a three-tier comparison strategy (OffsetDateTime → numeric → String). Supported operators: `lt`, `lteq`, `eq`, `neq`, `gt`, `gteq` (namespace prefix stripped automatically). The engine supports `odrl:dateTime` as a built-in operand that resolves to the current instant.
+
+**UsageDecision semantics:**
+
+| Tuple | Meaning |
+|---|---|
+| `(action, "true")` | Permission granted — caller may perform the action |
+| `(action, action)` | Delegated — engine cannot perform the action; caller must handle (e.g. show attribution notice) |
+| Absent | All constraints failed — access denied |
+
+```bash
+# List all policy records for the current tenant
+curl http://localhost:8007/api/v1/policies/{datasetId} \
+  -H "X-API-Key: dev-local"
+
+# Evaluate with B1-Level variable injection
+curl -X POST http://localhost:8007/api/v1/policies/{datasetId}/evaluate \
+  -H "X-API-Key: dev-local" -H "Content-Type: application/json" \
+  -d '{"M": {"callerRole": "DATA_OWNER", "callerId": "user-uuid"}, "F": {}}'
+
+# Fetch evaluation history
+curl "http://localhost:8007/api/v1/policies/{datasetId}/evaluations?page=0&size=20" \
+  -H "X-API-Key: dev-local"
+```
+
+---
+
 ## Authentication & User Management
 
 ### Overview
@@ -904,7 +1028,9 @@ The following users are pre-configured in the default realm:
 
 Users are managed through the Keycloak Admin Console. To add a new user:
 
-1. Open `http://localhost:8180` → log in as `admin` / `admin`
+1. Open the admin console → log in as `admin` / `admin`
+   - Docker Compose: `http://localhost:8180`
+   - MicroK8s: `http://keycloak.catalog.local/admin` (add the host to `/etc/hosts` as printed by `deploy.sh`)
 2. Select the **datacatalog** realm
 3. Go to **Users** → **Add user**
 4. Set email, first name, last name; click **Create**
@@ -912,9 +1038,11 @@ Users are managed through the Keycloak Admin Console. To add a new user:
 6. On the **Role mapping** tab assign one of the four catalog roles
 7. On the **Attributes** tab add:
    - Key `tenant_id` → value `00000000-0000-0000-0000-000000000001`
-   - Key `permissions` → values matching the role's permission set (see table above, one value per row)
+   - Key `permissions` → values matching the role's permission set (`catalog:read`, `catalog:write`, `catalog:admin` — see table above, one value per row)
 
 The `tenant_id` and `permissions` attributes are mapped into the JWT by Keycloak protocol mappers and are required for the backend services to accept the token.
+
+> The realm sets `unmanagedAttributePolicy: ADMIN_EDIT`, so the `tenant_id` and `permissions` attributes always save correctly from the Admin Console (or the Admin REST API). This policy ships with the realm import, so it applies automatically to any fresh deployment.
 
 ---
 
@@ -1048,6 +1176,11 @@ curl -H "X-API-Key: dev-local" http://localhost:8001/api/v1/datasets
 | `POST` | `/api/v1/logical-data-elements/{id}/reject-vocab-concepts` | Reject recommendations without creating mappings |
 | `POST` | `/api/v1/logical-models/{id}/recommend-vocab-concepts` | Bulk vocabulary concept recommendation job |
 | `GET` | `/api/v1/logical-models/recommend-vocab-concepts/jobs/{jobId}` | Poll bulk vocab recommendation job status |
+| `POST` | `/api/v1/logical-data-elements/{id}/recommend-pii` | AI-recommended `isPersonalInformation` and `isDirectIdentifier` values for one element |
+| `POST` | `/api/v1/logical-data-elements/{id}/accept-pii` | Accept the pending PII recommendation |
+| `POST` | `/api/v1/logical-data-elements/{id}/reject-pii` | Reject the pending PII recommendation |
+| `POST` | `/api/v1/logical-models/{id}/recommend-pii` | Bulk PII/identifier recommendation job for all elements in a model |
+| `GET` | `/api/v1/logical-models/recommend-pii/jobs/{jobId}` | Poll bulk PII recommendation job status |
 
 **Terms of Use (ODRL)**
 
@@ -1130,6 +1263,54 @@ The `semanticType` parameter filters by IRI terminal fragment (e.g. `?semanticTy
 
 ---
 
+### Policy API
+
+**Base URL:** `http://localhost:8007`
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/v1/policies/{datasetId}` | Retrieve the stored ODRL policy record for a dataset |
+| `PUT` | `/api/v1/policies/{datasetId}` | Upsert a policy. Body: `{"policyJson": "...", "policyLevel": "A"}` |
+| `DELETE` | `/api/v1/policies/{datasetId}` | Remove the policy record for a dataset |
+| `POST` | `/api/v1/policies/{datasetId}/evaluate` | Evaluate the policy. Body: `{"M": {}, "F": {}}`. Returns `{"granted": bool, "policyLevel": "A", "decisions": [...]}` |
+| `GET` | `/api/v1/policies/{datasetId}/evaluations` | Paginated evaluation log. Params: `page`, `size` |
+
+**`M` map (B1-Level variable injection):** Pass any runtime context that the stored policy references via `[=varName]` placeholders. Common keys: `callerRole`, `callerId`, `purpose`. Keys not referenced in the policy are silently ignored.
+
+**`F` map (C-Level coded functions):** Reserved for future extension. Pass `{}` for all current policies.
+
+```bash
+# B1-Level policy: allow read only for DATA_OWNER role
+POLICY='{
+  "@context": "http://www.w3.org/ns/odrl.jsonld", "@type": "Set",
+  "uid": "urn:example:b1",
+  "permission": [{
+    "target": "dataset:x", "action": "read",
+    "constraint": [{
+      "leftOperand": {"@value": "[=callerRole]", "@type": "xsd:string"},
+      "operator": "eq",
+      "rightOperand": {"@value": "DATA_OWNER", "@type": "xsd:string"}
+    }]
+  }]
+}'
+
+curl -X PUT "http://localhost:8007/api/v1/policies/{datasetId}" \
+  -H "X-API-Key: dev-local" -H "Content-Type: application/json" \
+  -d "{\"policyJson\": $(echo $POLICY | jq -Rc .), \"policyLevel\": \"B1\"}"
+
+curl -X POST "http://localhost:8007/api/v1/policies/{datasetId}/evaluate" \
+  -H "X-API-Key: dev-local" -H "Content-Type: application/json" \
+  -d '{"M": {"callerRole": "DATA_STEWARD"}, "F": {}}'
+# → {"granted": false, "decisions": []}
+
+curl -X POST "http://localhost:8007/api/v1/policies/{datasetId}/evaluate" \
+  -H "X-API-Key: dev-local" -H "Content-Type: application/json" \
+  -d '{"M": {"callerRole": "DATA_OWNER"}, "F": {}}'
+# → {"granted": true, "decisions": [{"action":"read","result":"true","delegated":false}]}
+```
+
+---
+
 ## Deployment
 
 ### Docker Compose
@@ -1154,7 +1335,7 @@ The repository ships a `docker-compose.yml` for the full stack and a `docker-com
 
 | Profile | Additional services |
 |---|---|
-| (default) | All 6 services + Kafka + PostgreSQL × 4 + OpenSearch + MinIO + Keycloak |
+| (default) | All 7 services + Kafka + PostgreSQL × 6 + OpenSearch + MinIO + Keycloak |
 | `ai` | Adds ai-service and Ollama |
 
 ```bash
@@ -1183,6 +1364,7 @@ docker compose up -d inventory-service
 | `MINIO_ROOT_USER` | harvest | `minio` | MinIO access key |
 | `MINIO_ROOT_PASSWORD` | harvest | `minio123` | MinIO secret key |
 | `OPENSEARCH_PASSWORD` | search | `admin` | OpenSearch admin password |
+| `POLICY_DB_PASSWORD` | policy | `policy` | PostgreSQL password for the policy-service database |
 | `OLLAMA_BASE_URL` | ai | `http://ollama:11434` | Ollama base URL |
 | `OPENAI_API_KEY` | ai | (empty) | OpenAI key; takes precedence over Ollama if set |
 | `AI_CHAT_MODEL` | ai | `llama3` | Chat model name |
@@ -1213,7 +1395,7 @@ Raw Kubernetes manifests live under `infra/kubernetes/`. Fourteen numbered YAML 
 ```bash
 export IMAGE_REGISTRY=localhost:32000/   # MicroK8s built-in registry
 
-for svc in inventory-service harvest-service lineage-service search-service ai-service identity-service; do
+for svc in inventory-service harvest-service lineage-service search-service ai-service identity-service policy-service; do
   docker build -t ${IMAGE_REGISTRY}odin/${svc}:latest services/${svc}/
   docker push ${IMAGE_REGISTRY}odin/${svc}:latest
 done
@@ -1272,13 +1454,13 @@ The seed script establishes `kubectl port-forward` tunnels to each service, wait
 | `01-serviceaccount.yaml` | Default service account |
 | `02-secrets.yaml` | PostgreSQL passwords, MinIO credentials, Keycloak admin password |
 | `03-configmaps.yaml` | Common Spring config, Kafka topic script, OpenSearch index mapping, Keycloak realm |
-| `10-postgres.yaml` | Five StatefulSets: inventory, harvest, lineage (Apache AGE), identity, ai (pgvector) |
+| `10-postgres.yaml` | Six StatefulSets: inventory, harvest, lineage (Apache AGE), identity, ai (pgvector), policy |
 | `11-kafka.yaml` | KRaft-mode Kafka StatefulSet (no ZooKeeper) |
 | `12-opensearch.yaml` | OpenSearch with privileged sysctl init container (`vm.max_map_count=262144`) |
 | `13-minio.yaml` | MinIO Deployment for harvest snapshots |
 | `14-redis.yaml` | Redis for Quartz scheduler clustering |
 | `15-keycloak.yaml` | Keycloak 24 with realm auto-import |
-| `20-backend-services.yaml` | Six Spring Boot Deployments + ClusterIP Services |
+| `20-backend-services.yaml` | Seven Spring Boot Deployments + ClusterIP Services |
 | `21-frontends.yaml` | Producer and Consumer frontend Deployments + Services |
 | `22-ingress.yaml` | NGINX Ingress for all three virtual hosts |
 | `30-jobs.yaml` | One-shot Jobs: Kafka topic creation and OpenSearch index initialisation |
@@ -1323,7 +1505,7 @@ All passwords in `docker-compose.yml` now default to weak fallbacks (`${VAR:-fal
 
 | Variable | What it protects |
 |---|---|
-| `INVENTORY_DB_PASSWORD` … `AI_DB_PASSWORD` | Five PostgreSQL databases |
+| `INVENTORY_DB_PASSWORD` … `POLICY_DB_PASSWORD` | Six PostgreSQL databases |
 | `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | MinIO object store |
 | `KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD` | Keycloak admin console |
 | `KEYCLOAK_CLIENT_SECRET` | Identity-service M2M Keycloak client |
@@ -1396,6 +1578,7 @@ Then restart the services (`docker compose up -d`). Each service exposes a uniqu
 | `search-service` | 8004 | **5004** |
 | `ai-service` | 8005 | **5005** |
 | `identity-service` | 8006 | **5006** |
+| `policy-service` | 8007 | **5007** |
 
 Connect your IDE to `localhost:<debug-port>`. The JVM logs `Listening for transport dt_socket at address: 5005` on startup when active. Leave `JAVA_TOOL_OPTIONS=` (empty) to disable with zero overhead.
 

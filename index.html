@@ -910,6 +910,7 @@
         <a class="nav-link" onclick="show('svc-search')">Search Service</a>
         <a class="nav-link" onclick="show('svc-ai')">AI Service</a>
         <a class="nav-link" onclick="show('svc-identity')">Identity Service</a>
+        <a class="nav-link" onclick="show('svc-policy')">Policy Service</a>
       </div>
 
       <div class="nav-divider"></div>
@@ -931,6 +932,8 @@
         <a class="nav-link" onclick="show('api-lineage')">Lineage API</a>
         <a class="nav-link" onclick="show('api-search')">Search API</a>
         <a class="nav-link" onclick="show('api-ai')">AI API</a>
+        <a class="nav-link" onclick="show('api-identity')">Identity API</a>
+        <a class="nav-link" onclick="show('api-policy')">Policy API</a>
       </div>
 
       <div class="nav-divider"></div>
@@ -977,7 +980,7 @@
             lifecycle stage, and access policy.</li>
           <li><strong>AI-powered Q&amp;A</strong> — a Spring AI RAG pipeline runs over your metadata corpus using Ollama
             (local) or OpenAI.</li>
-          <li><strong>AI metadata enrichment</strong> — per-element classification, description, and vocabulary concept recommendations, all owner-reviewed before acceptance.</li>
+          <li><strong>AI metadata enrichment</strong> — per-element classification, description, and vocabulary concept recommendations, all owner-reviewed before acceptance. PII / direct-identifier detection maps elements to W3C DPV-PD concept IRIs, automatically elevating terms-of-use access levels.</li>
           <li><strong>ODRL terms of use</strong> — access-level policy (OPEN → HIGHLY_RESTRICTED) derived automatically from element classifications and vocabulary mappings; displayed to consumers, governed by data owners.</li>
           <li><strong>Accountable data ownership</strong> — role-based dataset ownership with a
             proposal-and-approval transfer workflow and a full audit history. The governance dashboard surfaces
@@ -1026,6 +1029,11 @@
             <td><strong>ODRL</strong></td>
             <td>W3C</td>
             <td>Terms-of-use policies — permissions, prohibitions, obligations derived from element classifications and vocabulary concepts</td>
+          </tr>
+          <tr>
+            <td><strong>DPV / DPV-PD</strong></td>
+            <td>W3C</td>
+            <td>W3C Data Privacy Vocabulary — PII and direct-identifier classification on logical model elements; DPV-PD concept IRIs drive AI PII detection</td>
           </tr>
         </table>
 
@@ -1326,7 +1334,7 @@ docker compose --profile ai up -d</code></pre>
       <article class="page" id="page-arch-overview" data-title="Architecture Overview" data-section="Architecture">
         <div class="breadcrumb"><span>Docs</span> › <span>Architecture</span> › Overview</div>
         <h1>Architecture Overview</h1>
-        <p>ODIN follows Domain-Driven Design with a database-per-service pattern. Six Spring Boot 3.3 microservices
+        <p>ODIN follows Domain-Driven Design with a database-per-service pattern. Seven Spring Boot 3.3 microservices
           communicate via Kafka events. Traefik routes external HTTP traffic.</p>
 
         <div class="erd-wrapper" id="erd-wrapper-topo">
@@ -1364,6 +1372,7 @@ docker compose --profile ai up -d</code></pre>
               SRC["search-service :8004\nOpenSearch :9200"]
               AIS["ai-service :8005\nPostgreSQL+pgvector :5437"]
               IDS["identity-service :8006\nPostgreSQL :5436 · Keycloak :8180"]
+              POL["policy-service :8007\nPostgreSQL :5438"]
               end
               APIS <-->|events| KFK["Apache Kafka :9092\nKRaft · no ZooKeeper"]
             </div>
@@ -1441,6 +1450,12 @@ docker compose --profile ai up -d</code></pre>
             <td>PostgreSQL 16</td>
             <td>Keycloak OAuth2/OIDC, role-based access (Administrator, Data Owner, Steward, Governance), user provisioning with Keycloak sync, API keys, tenant management</td>
           </tr>
+          <tr>
+            <td><strong>policy-service</strong></td>
+            <td>8007</td>
+            <td>PostgreSQL 16</td>
+            <td>ODRL policy registry and ODRE enforcement engine (PDP). Evaluates A-Level and B1-Level policies at request time; syncs policies from dataset change events via Kafka; persists evaluation log.</td>
+          </tr>
         </table>
 
         <div class="page-nav">
@@ -1473,7 +1488,7 @@ docker compose --profile ai up -d</code></pre>
           <tr>
             <td><code>inventory.datasets.changes</code></td>
             <td>inventory-service</td>
-            <td>search-service, ai-service</td>
+            <td>search-service, ai-service, policy-service</td>
             <td>Yes</td>
           </tr>
           <tr>
@@ -1498,6 +1513,18 @@ docker compose --profile ai up -d</code></pre>
             <td><code>lineage.graph.updated</code></td>
             <td>lineage-service</td>
             <td>search-service</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td><code>policy.records.changes</code></td>
+            <td>policy-service</td>
+            <td>— (reserved for future PEPs)</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td><code>policy.evaluations.completed</code></td>
+            <td>policy-service</td>
+            <td>API gateway / consumer (planned)</td>
             <td>No</td>
           </tr>
         </table>
@@ -2011,7 +2038,7 @@ curl -s -X POST \
       <article class="page" id="page-model-vocab" data-title="Vocabulary & FIBO" data-section="Data Model">
         <div class="breadcrumb"><span>Docs</span> › <span>Data Model</span> › Vocabulary &amp; FIBO</div>
         <h1>Vocabulary &amp; FIBO</h1>
-        <p>ODIN ships with six system vocabularies pre-loaded. You can register additional RDF vocabularies at any time.
+        <p>ODIN ships with seven system vocabularies pre-loaded. You can register additional RDF vocabularies at any time.
         </p>
 
         <h2>Pre-loaded vocabularies</h2>
@@ -2057,6 +2084,18 @@ curl -s -X POST \
             <td><code>skos</code></td>
             <td>general</td>
             <td><code>http://www.w3.org/2004/02/skos/core#</code></td>
+          </tr>
+          <tr>
+            <td>DPV</td>
+            <td><code>dpv</code></td>
+            <td>privacy</td>
+            <td><code>https://w3id.org/dpv#</code></td>
+          </tr>
+          <tr>
+            <td>DPV-PD</td>
+            <td><code>dpv</code></td>
+            <td>privacy</td>
+            <td><code>https://w3id.org/dpv/pd#</code></td>
           </tr>
         </table>
 
@@ -2227,16 +2266,73 @@ curl "http://localhost:8004/api/v1/search?fibo_concept=fibo-fnd-acc-cur%3ACurren
         <h2>IRI → label translation</h2>
         <p>Raw concept IRIs are never shown in the UI. The inventory-service resolves them to human-readable labels via
           <code>GET /api/v1/vocabularies/translate?iri=&lt;iri&gt;</code> (single) and
-          <code>POST /api/v1/vocabularies/translate</code> (a JSON array of IRIs → an IRI→label map). The frontend
+          <code>POST /api/v1/vocabularies/translate</code> (a JSON array of IRIs → <code>{“translations”:{“iri”:”label”,...}}</code>). The frontend
           batches lookups and caches results in <code>localStorage</code>, so a mapping like
           <code>fibo-fnd-acc-cur:Currency</code> renders as “Currency” everywhere.</p>
 
-        <div class="page-nav">
-          <a class="page-nav-btn" onclick="show('model-vocab')">
-            <span class="dir">← Previous</span><span class="label">Vocabulary &amp; FIBO</span>
+        <h2>DPV &amp; DPV-PD: privacy vocabulary for AI PII detection</h2>
+        <p>ODIN pre-loads the <a href=”https://w3c.github.io/dpv/”>W3C Data Privacy Vocabulary (DPV)</a> and its
+          personal-data extension (DPV-PD) alongside FIBO. DPV gives the AI service a precise, machine-readable
+          vocabulary for classifying data elements as personal information or direct identifiers — the same
+          vocabulary referenced in GDPR guidance and privacy impact assessments.</p>
+        <p>When you request PII recommendations for a logical data element, the AI service maps each element to
+          a DPV-PD concept IRI (e.g. <code>https://w3id.org/dpv/pd#Name</code>,
+          <code>https://w3id.org/dpv/pd#EmailAddress</code>) and sets <code>isPersonalInformation</code> /
+          <code>isDirectIdentifier</code> flags. Accepted recommendations are stored as vocabulary mappings under the
+          <code>dpv</code> prefix and propagate into the ODRL terms-of-use derivation — a column mapped to any
+          DPV-PD direct-identifier concept automatically elevates the dataset's access level toward
+          <code>HIGHLY_RESTRICTED</code>.</p>
+        <table>
+          <tr>
+            <th>DPV-PD concept IRI</th>
+            <th>Meaning</th>
+            <th>isDirectIdentifier</th>
+          </tr>
+          <tr>
+            <td><code>dpv-pd:Name</code></td>
+            <td>Person's full or partial name</td>
+            <td>Yes</td>
+          </tr>
+          <tr>
+            <td><code>dpv-pd:EmailAddress</code></td>
+            <td>Email address</td>
+            <td>Yes</td>
+          </tr>
+          <tr>
+            <td><code>dpv-pd:PhoneNumber</code></td>
+            <td>Telephone number</td>
+            <td>Yes</td>
+          </tr>
+          <tr>
+            <td><code>dpv-pd:NationalIdentificationNumber</code></td>
+            <td>Government-issued ID (SSN, passport)</td>
+            <td>Yes</td>
+          </tr>
+          <tr>
+            <td><code>dpv-pd:Location</code></td>
+            <td>Geographic location data</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td><code>dpv-pd:BehavioralData</code></td>
+            <td>Usage, click-stream, or activity data</td>
+            <td>No</td>
+          </tr>
+        </table>
+        <div class=”callout tip”>
+          <span class=”callout-icon”>✓</span>
+          <div>Use <code>POST /api/v1/logical-models/{modelId}/recommend-pii</code> to run bulk DPV-PD classification
+            across all elements in a logical model. Individual elements use
+            <code>POST /api/v1/logical-data-elements/{elementId}/recommend-pii</code>.
+          </div>
+        </div>
+
+        <div class=”page-nav”>
+          <a class=”page-nav-btn” onclick=”show('model-vocab')”>
+            <span class=”dir”>← Previous</span><span class=”label”>Vocabulary &amp; FIBO</span>
           </a>
-          <a class="page-nav-btn right" onclick="show('model-semantic')">
-            <span class="dir">Next →</span><span class="label">Semantic Types</span>
+          <a class=”page-nav-btn right” onclick=”show('model-semantic')”>
+            <span class=”dir”>Next →</span><span class=”label”>Semantic Types</span>
           </a>
         </div>
       </article>
@@ -3286,7 +3382,8 @@ curl "http://localhost:8004/api/v1/search/suggest?q=trad" \
           <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
           </div>
           <pre><code class="language-bash">curl -X POST http://localhost:8004/api/v1/admin/reindex \
-  -H "X-API-Key: dev-local"</code></pre>
+  -H "X-API-Key: dev-local"
+# → {"datasetsIndexed":142,"dataProductsIndexed":31,"distributionsIndexed":287}</code></pre>
         </div>
 
         <div class="page-nav">
@@ -3322,16 +3419,30 @@ curl -N -X POST http://localhost:8005/api/v1/conversations/$CONV/messages \
   -H "Content-Type: application/json" \
   -H "X-API-Key: dev-local" \
   -H "Accept: text/event-stream" \
-  -d '{"content": "Which datasets contain monetary amounts mapped to FIBO?"}'</code></pre>
+  -d '{"content": "Which datasets contain monetary amounts mapped to FIBO?"}'
+
+# Multi-dataset SQL query — schema for both datasets loaded; join hints derived from shared vocab IRIs;
+# platform conflict detected if datasets are on different systems (Snowflake vs Delta Lake, etc.)
+curl -N -X POST http://localhost:8005/api/v1/conversations/$CONV/messages \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: dev-local" \
+  -H "Accept: text/event-stream" \
+  -d '{
+    "content": "Write a Snowflake SQL join between trade positions and counterparty master",
+    "focusDatasetIds": ["&lt;trade-positions-id&gt;", "&lt;counterparty-master-id&gt;"]
+  }'</code></pre>
         </div>
 
         <h2>Embedding pipeline</h2>
-        <p>The ai-service listens on <code>inventory.datasets.changes</code> and
-          <code>inventory.data-products.changes</code>. On each event it fetches the enriched entity from
-          inventory-service,
-          chunks the text (title + description + element names + vocabulary labels), embeds the chunks using the
-          configured model, and upserts into the pgvector store.
+        <p>The ai-service listens on <code>inventory.datasets.changes</code>. On each event it builds four
+          pgvector chunks per dataset and upserts them:
         </p>
+        <ul>
+          <li><strong>Chunk 0</strong> — title + description</li>
+          <li><strong>Chunk 1</strong> — keywords + themes</li>
+          <li><strong>Chunk 2</strong> — semantic types + vocabulary concept labels + logical element names</li>
+          <li><strong>Chunk 3</strong> — physical column names and SQL datatypes (used to ground multi-dataset queries)</li>
+        </ul>
 
         <h2>Element classification &amp; description</h2>
         <p>The ai-service provides two metadata enrichment operations for logical data elements:</p>
@@ -3460,6 +3571,86 @@ curl -N -X POST http://localhost:8005/api/v1/conversations/$CONV/messages \
           <a class="page-nav-btn" onclick="show('svc-ai')">
             <span class="dir">← Previous</span><span class="label">AI Service</span>
           </a>
+          <a class="page-nav-btn right" onclick="show('svc-policy')">
+            <span class="dir">Next →</span><span class="label">Policy Service</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     POLICY SERVICE
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-svc-policy" data-title="Policy Service" data-section="Services">
+        <div class="breadcrumb"><span>Docs</span> › <span>Services</span> › Policy Service</div>
+        <h1>Policy Service</h1>
+        <p><strong>Port:</strong> 8007 &nbsp;|&nbsp; <strong>Database:</strong> PostgreSQL 16 (port 5438)</p>
+        <p>The policy-service is the platform's <strong>Policy Decision Point (PDP)</strong>. It holds the ODRL
+          policy registry for all datasets and evaluates them on demand using an internal implementation of the
+          <strong>ODRE enforcement algorithm</strong> (Cimmino et al., <em>Computers &amp; Security</em>, 2025) — a
+          concrete enforcement layer on top of ODRL that produces machine-readable <code>UsageDecision</code> tuples
+          at request time.</p>
+
+        <h2>Responsibilities</h2>
+        <ul>
+          <li>Maintain a <code>policy_records</code> registry keyed by <code>(dataset_id, tenant_id)</code></li>
+          <li>Auto-sync policies from <code>inventory.datasets.changes</code> Kafka events when a data owner accepts terms</li>
+          <li>Evaluate ODRL policies at request time via <code>POST /api/v1/policies/{datasetId}/evaluate</code></li>
+          <li>Persist an <code>evaluation_log</code> for every evaluation call</li>
+          <li>Publish <code>PolicyEvaluationResultPayload</code> to <code>policy.evaluations.completed</code></li>
+        </ul>
+
+        <h2>Policy levels</h2>
+        <table>
+          <tr><th>Level</th><th>Description</th></tr>
+          <tr>
+            <td><strong>A-Level</strong></td>
+            <td>Pure ODRL JSON-LD. Static constraint evaluation — dateTime, numeric, string comparisons. All policies generated by <code>TermsOfUseService</code> are A-Level.</td>
+          </tr>
+          <tr>
+            <td><strong>B1-Level</strong></td>
+            <td>Variable injection: <code>[=varName]</code> placeholders in the stored policy are resolved from the <code>M</code> map passed at evaluation time. Use to inject caller role, caller ID, or any runtime value.</td>
+          </tr>
+        </table>
+
+        <h2>UsageDecision semantics</h2>
+        <table>
+          <tr><th>Tuple</th><th>Meaning</th></tr>
+          <tr><td><code>(action, "true")</code></td><td>Permission granted</td></tr>
+          <tr><td><code>(action, action)</code></td><td>Delegated — caller must handle (e.g. show attribution notice)</td></tr>
+          <tr><td>Absent</td><td>All constraints failed — access denied</td></tr>
+        </table>
+
+        <h2>Quick examples</h2>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre><code class="language-bash"># Register a policy (upsert)
+curl -X PUT http://localhost:8007/api/v1/policies/{datasetId} \
+  -H "X-API-Key: dev-local" -H "Content-Type: application/json" \
+  -d '{"policyJson":"{...odrl...}","policyLevel":"A"}'
+
+# Evaluate access (A-Level — no M variables needed)
+curl -X POST http://localhost:8007/api/v1/policies/{datasetId}/evaluate \
+  -H "X-API-Key: dev-local" -H "Content-Type: application/json" \
+  -d '{"M":{},"F":{}}'
+# → {"granted":true,"policyLevel":"A","decisions":[{"action":"read","result":"true","delegated":false}]}
+
+# Evaluate access (B1-Level — inject callerRole at runtime)
+curl -X POST http://localhost:8007/api/v1/policies/{datasetId}/evaluate \
+  -H "X-API-Key: dev-local" -H "Content-Type: application/json" \
+  -d '{"M":{"callerRole":"DATA_OWNER"},"F":{}}'</code></pre>
+        </div>
+
+        <div class="callout info">
+          <span class="callout-icon">ℹ</span>
+          <div>Policies are also auto-registered when a data owner accepts terms in the producer UI — the <code>hasPolicy</code> field on the <code>DatasetChangedPayload</code> Kafka event triggers an upsert without any manual API call.</div>
+        </div>
+
+        <p>See <a onclick="show('api-policy')" style="cursor:pointer">Policy API →</a> for the full endpoint reference.</p>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('svc-identity')">
+            <span class="dir">← Previous</span><span class="label">Identity Service</span>
+          </a>
           <a class="page-nav-btn right" onclick="show('user-mgmt')">
             <span class="dir">Next →</span><span class="label">Roles &amp; Login</span>
           </a>
@@ -3553,7 +3744,7 @@ curl -N -X POST http://localhost:8005/api/v1/conversations/$CONV/messages \
 
         <h2>Via Keycloak Admin Console</h2>
         <ol>
-          <li>Open <code>http://localhost:8180</code> and log in as <code>admin</code> / <code>admin</code></li>
+          <li>Open the admin console and log in as <code>admin</code> / <code>admin</code> — Docker Compose: <code>http://localhost:8180</code>; MicroK8s: <code>http://keycloak.catalog.local/admin</code> (add the host to <code>/etc/hosts</code> as printed by <code>deploy.sh</code>)</li>
           <li>Select the <strong>datacatalog</strong> realm from the top-left dropdown</li>
           <li>Go to <strong>Users</strong> → <strong>Add user</strong></li>
           <li>Set <strong>Email</strong>, <strong>First name</strong>, <strong>Last name</strong>; enable <strong>Email verified</strong>; click <strong>Create</strong></li>
@@ -3588,6 +3779,11 @@ curl -N -X POST http://localhost:8005/api/v1/conversations/$CONV/messages \
         <div class="callout info">
           <span class="callout-icon">ℹ</span>
           <div>The <code>tenant_id</code> and <code>permissions</code> attributes are mapped into the JWT by Keycloak protocol mappers. Without them the backend services will reject the token with 403.</div>
+        </div>
+
+        <div class="callout info">
+          <span class="callout-icon">ℹ</span>
+          <div>The realm sets <code>unmanagedAttributePolicy: ADMIN_EDIT</code>, so the <code>tenant_id</code> and <code>permissions</code> attributes always save correctly from the Admin Console or the Admin REST API. This policy ships with the realm import, so it applies automatically to any fresh deployment.</div>
         </div>
 
         <h2>Force logout / session revocation</h2>
@@ -3757,119 +3953,144 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" \
         <div class="breadcrumb"><span>Docs</span> › <span>API Reference</span> › Inventory API</div>
         <h1>Inventory API <small style="font-size:14px;color:var(--subtle);font-weight:400">:8001</small></h1>
 
+        <h2>Catalogs</h2>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/catalogs</code><p>List all catalogs for the tenant.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/catalogs</code><p>Create a catalog.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/catalogs/{id}</code><p>Get catalog by ID.</p></div>
+        <div class="endpoint"><span class="badge badge-put">PUT</span><code>/api/v1/catalogs/{id}</code><p>Update a catalog.</p></div>
+        <div class="endpoint"><span class="badge badge-delete">DELETE</span><code>/api/v1/catalogs/{id}</code><p>Delete a catalog.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/catalogs/{id}/export</code><p>Export catalog as DCAT 3.0 JSON-LD. Set <code>Accept: application/ld+json</code>.</p></div>
+
         <h2>Datasets</h2>
-        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets</code>
-          <p>List datasets. Query params: <code>page</code>, <code>size</code>, <code>domain</code>,
-            <code>format</code>.
-          </p>
-        </div>
-        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/datasets</code>
-          <p>Create a new dataset.</p>
-        </div>
-        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets/{id}</code>
-          <p>Get dataset by ID.</p>
-        </div>
-        <div class="endpoint"><span class="badge badge-put">PUT</span><code>/api/v1/datasets/{id}</code>
-          <p>Replace all fields of a dataset.</p>
-        </div>
-        <div class="endpoint"><span class="badge badge-delete">DELETE</span><code>/api/v1/datasets/{id}</code>
-          <p>Soft-delete a dataset and its distributions.</p>
-        </div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets</code><p>List datasets. Params: <code>page</code>, <code>size</code>, <code>catalogId</code>, <code>domain</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/datasets</code><p>Create a new dataset.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets/{id}</code><p>Get dataset by ID.</p></div>
+        <div class="endpoint"><span class="badge badge-put">PUT</span><code>/api/v1/datasets/{id}</code><p>Replace all fields of a dataset.</p></div>
+        <div class="endpoint"><span class="badge badge-delete">DELETE</span><code>/api/v1/datasets/{id}</code><p>Soft-delete a dataset and its distributions.</p></div>
 
         <h2>Dataset semantic types</h2>
-        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets/{id}/semantic-context</code>
-          <p>Semantic types and vocabulary context derived from the dataset's published logical models. See
-            <a onclick="show('model-semantic')">Semantic Types</a>.</p>
-        </div>
-        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/datasets/{id}/semantic-tags</code>
-          <p>Accept a semantic type tag (AI-recommended or manual) directly on the dataset.</p>
-        </div>
-        <div class="endpoint"><span
-            class="badge badge-delete">DELETE</span><code>/api/v1/datasets/{id}/semantic-tags/{tagId}</code>
-          <p>Remove a previously accepted semantic tag.</p>
-        </div>
-        <div class="endpoint"><span
-            class="badge badge-post">POST</span><code>/api/v1/datasets/{id}/recommend-semantic-context</code>
-          <p>AI semantic type recommendations for the dataset (proxies the ai-service).</p>
-        </div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets/{id}/semantic-context</code><p>Semantic types and vocabulary context aggregated from the dataset's published logical models.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/datasets/{id}/recommend-semantic-context</code><p>Request AI semantic type recommendations for the dataset (proxies the ai-service).</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/datasets/{id}/semantic-tags</code><p>Accept a semantic type tag. Body: <code>{"type":"...","vocabularyIri":"..."}</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-delete">DELETE</span><code>/api/v1/datasets/{id}/semantic-tags/{tagId}</code><p>Remove a previously accepted semantic tag.</p></div>
 
         <h2>Dataset ownership &amp; audit</h2>
-        <div class="endpoint"><span class="badge badge-put">PUT</span><code>/api/v1/datasets/{id}/owner</code>
-          <p>Assign a data owner to an unowned dataset. Body: <code>{"userId":"..."}</code>. Use the transfer
-            workflow if the dataset is already owned.</p>
-        </div>
-        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets/{id}/history</code>
-          <p>Reverse-chronological, paginated audit log for the dataset.</p>
-        </div>
-        <div class="endpoint"><span
-            class="badge badge-post">POST</span><code>/api/v1/datasets/{id}/ownership-proposals</code>
-          <p>Propose transferring ownership to another user. Body: <code>{"proposedOwnerId":"..."}</code>. The current
-            owner must approve.</p>
-        </div>
-        <div class="endpoint"><span
-            class="badge badge-post">POST</span><code>/api/v1/datasets/{id}/ownership-proposals/{proposalId}/approve</code>
-          <p>Approve a pending proposal (current owner or admin); updates the dataset's owner.</p>
-        </div>
-        <div class="endpoint"><span
-            class="badge badge-post">POST</span><code>/api/v1/datasets/{id}/ownership-proposals/{proposalId}/reject</code>
-          <p>Reject a pending proposal (current owner or admin).</p>
-        </div>
-        <div class="endpoint"><span
-            class="badge badge-get">GET</span><code>/api/v1/datasets/{id}/ownership-proposals/pending</code>
-          <p>The current PENDING proposal, or <code>204</code> if none. See
-            <a onclick="show('model-governance')">Governance &amp; Audit</a>.</p>
-        </div>
+        <div class="endpoint"><span class="badge badge-put">PUT</span><code>/api/v1/datasets/{id}/owner</code><p>Assign a data owner to an unowned dataset. Body: <code>{"userId":"..."}</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets/{id}/history</code><p>Reverse-chronological, paginated audit log. Params: <code>page</code>, <code>size</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/datasets/{id}/ownership-proposals</code><p>Propose ownership transfer. Body: <code>{"proposedOwnerId":"..."}</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets/{id}/ownership-proposals/pending</code><p>The current PENDING proposal, or <code>204</code> if none.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/datasets/{id}/ownership-proposals/{proposalId}/approve</code><p>Approve a pending proposal (current owner or admin).</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/datasets/{id}/ownership-proposals/{proposalId}/reject</code><p>Reject a pending proposal.</p></div>
+
+        <h2>Terms of use</h2>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets/{id}/terms-of-use</code><p>Get the derived or explicitly accepted ODRL terms of use for the dataset.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/datasets/{id}/terms-of-use/accept</code><p>Data owner accepts and locks the current derived terms as the explicit policy.</p></div>
+        <div class="endpoint"><span class="badge badge-delete">DELETE</span><code>/api/v1/datasets/{id}/terms-of-use/policy</code><p>Reset: removes the explicit policy so the dataset reverts to dynamically derived terms.</p></div>
+
+        <h2>Distributions</h2>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/distributions</code><p>List all distributions for the tenant. Params: <code>page</code>, <code>size</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets/{datasetId}/distributions</code><p>List distributions for a specific dataset.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/datasets/{datasetId}/distributions</code><p>Create a distribution for a dataset.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/distributions/{id}</code><p>Get distribution by ID.</p></div>
+        <div class="endpoint"><span class="badge badge-put">PUT</span><code>/api/v1/distributions/{id}</code><p>Update a distribution.</p></div>
+        <div class="endpoint"><span class="badge badge-delete">DELETE</span><code>/api/v1/distributions/{id}</code><p>Delete a distribution.</p></div>
+
+        <h2>Physical Schema (CSV-W)</h2>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets/{datasetId}/physical-schema</code><p>Get physical schema columns for a dataset.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/datasets/{datasetId}/physical-schema</code><p>Set or replace the physical schema for a dataset.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/distributions/{distributionId}/physical-schema</code><p>Get physical schema for a distribution.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/distributions/{distributionId}/physical-schema</code><p>Set or replace the physical schema for a distribution.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/distributions/{distributionId}/suggest-element-mappings</code><p>AI-suggested bindings from physical columns to logical elements. Param: <code>modelId</code>.</p></div>
 
         <h2>Data Products</h2>
-        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/data-products</code>
-          <p>List. Query params: <code>lifecycleStatus</code>, <code>domain</code>.</p>
-        </div>
-        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/data-products</code>
-          <p>Create a data product.</p>
-        </div>
-        <div class="endpoint"><span
-            class="badge badge-patch">PATCH</span><code>/api/v1/data-products/{id}/lifecycle</code>
-          <p>Transition lifecycle: <code>{"status":"Deploy"}</code>.</p>
-        </div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/data-products</code><p>List data products. Params: <code>domain</code>, <code>lifecycleStatus</code>, <code>page</code>, <code>size</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/data-products</code><p>Create a data product.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/data-products/{id}</code><p>Get data product by ID.</p></div>
+        <div class="endpoint"><span class="badge badge-put">PUT</span><code>/api/v1/data-products/{id}</code><p>Update a data product.</p></div>
+        <div class="endpoint"><span class="badge badge-patch">PATCH</span><code>/api/v1/data-products/{id}/lifecycle</code><p>Transition lifecycle status. Body: <code>{"status":"Deploy"}</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-delete">DELETE</span><code>/api/v1/data-products/{id}</code><p>Delete a data product.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/data-products/{id}/datasets</code><p>List datasets linked to this data product.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/data-products/{id}/datasets</code><p>Link a dataset. Body: <code>{"datasetId":"..."}</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-delete">DELETE</span><code>/api/v1/data-products/{id}/datasets/{datasetId}</code><p>Unlink a dataset from this data product.</p></div>
 
         <h2>Logical Models</h2>
-        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets/{id}/logical-models</code>
-          <p>List logical models for a dataset.</p>
-        </div>
-        <div class="endpoint"><span
-            class="badge badge-post">POST</span><code>/api/v1/datasets/{id}/logical-models</code>
-          <p>Create a new logical model.</p>
-        </div>
-        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/logical-models/{id}/elements</code>
-          <p>List data elements.</p>
-        </div>
-        <div class="endpoint"><span
-            class="badge badge-post">POST</span><code>/api/v1/logical-data-elements/{id}/bind</code>
-          <p>Bind element to a physical column.</p>
-        </div>
-        <div class="endpoint"><span
-            class="badge badge-post">POST</span><code>/api/v1/logical-data-elements/{id}/vocab-mappings</code>
-          <p>Add a SKOS vocabulary mapping.</p>
-        </div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets/{datasetId}/logical-models</code><p>List logical models for a dataset.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/datasets/{datasetId}/logical-models</code><p>Create a new logical model (initially in <code>draft</code> status).</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/logical-models/{id}</code><p>Get a logical model with its elements.</p></div>
+        <div class="endpoint"><span class="badge badge-patch">PATCH</span><code>/api/v1/logical-models/{id}/status</code><p>Transition status. Body: <code>{"status":"published"}</code>. Published models are immutable.</p></div>
+        <div class="endpoint"><span class="badge badge-delete">DELETE</span><code>/api/v1/logical-models/{id}</code><p>Delete a logical model and all its elements.</p></div>
+
+        <h2>Logical Elements</h2>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/logical-models/{modelId}/elements</code><p>List elements in a logical model.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/logical-models/{modelId}/elements</code><p>Add a logical data element to a model.</p></div>
+        <div class="endpoint"><span class="badge badge-put">PUT</span><code>/api/v1/logical-data-elements/{elementId}</code><p>Update a logical data element.</p></div>
+        <div class="endpoint"><span class="badge badge-delete">DELETE</span><code>/api/v1/logical-data-elements/{elementId}</code><p>Delete a logical data element.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/logical-data-elements/{elementId}/bind</code><p>Bind element to a physical column. Body: <code>{"physicalColumnId":"..."}</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-delete">DELETE</span><code>/api/v1/logical-data-elements/{elementId}/bind</code><p>Unbind the physical column from an element.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/logical-data-elements/{elementId}/vocab-mappings</code><p>List SKOS vocabulary mappings for an element.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/logical-data-elements/{elementId}/vocab-mappings</code><p>Add a vocabulary mapping. Body: <code>{"vocabularyId":"...","conceptIri":"...","matchType":"exactMatch"}</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-delete">DELETE</span><code>/api/v1/vocab-mappings/{mappingId}</code><p>Delete a vocabulary mapping.</p></div>
+
+        <h2>AI enrichment — single element</h2>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/logical-data-elements/{elementId}/recommend-classification</code><p>Request an AI classification recommendation (<code>PUBLIC</code>…<code>HIGH_CONFIDENTIAL</code>).</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/logical-data-elements/{elementId}/accept-classification</code><p>Accept the pending AI classification.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/logical-data-elements/{elementId}/reject-classification</code><p>Reject the pending AI classification.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/logical-data-elements/{elementId}/recommend-description</code><p>Request an AI description recommendation.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/logical-data-elements/{elementId}/accept-description</code><p>Accept the pending AI description.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/logical-data-elements/{elementId}/reject-description</code><p>Reject the pending AI description.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/logical-data-elements/{elementId}/recommend-vocab-concepts</code><p>Request AI vocabulary concept recommendations (up to 5 SKOS concepts from available vocabularies).</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/logical-data-elements/{elementId}/accept-vocab-concepts</code><p>Accept vocabulary concept recommendations. Body: <code>{"iris":["iri1"]}</code> for a subset, or <code>{}</code> to accept all.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/logical-data-elements/{elementId}/reject-vocab-concepts</code><p>Reject all pending vocabulary concept recommendations.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/logical-data-elements/{elementId}/recommend-pii</code><p>Request AI PII indicator recommendations (<code>isPersonalInformation</code>, <code>isDirectIdentifier</code>).</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/logical-data-elements/{elementId}/accept-pii</code><p>Accept the pending PII indicator recommendation.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/logical-data-elements/{elementId}/reject-pii</code><p>Reject the pending PII indicator recommendation.</p></div>
+
+        <h2>AI enrichment — bulk (model-wide async)</h2>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/logical-models/{modelId}/recommend-classifications</code><p>Start async bulk classification job for all elements. Returns a job ID.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/logical-models/recommend-classifications/jobs/{jobId}</code><p>Poll job status: <code>PENDING</code>, <code>RUNNING</code>, <code>COMPLETED</code>, <code>FAILED</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/logical-models/{modelId}/recommend-descriptions</code><p>Start async bulk description recommendation job.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/logical-models/recommend-descriptions/jobs/{jobId}</code><p>Poll bulk description job status.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/logical-models/{modelId}/recommend-vocab-concepts</code><p>Start async bulk vocabulary concept recommendation job.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/logical-models/recommend-vocab-concepts/jobs/{jobId}</code><p>Poll bulk vocab concept job status.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/logical-models/{modelId}/recommend-pii</code><p>Start async bulk PII indicator recommendation job.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/logical-models/recommend-pii/jobs/{jobId}</code><p>Poll bulk PII job status.</p></div>
 
         <h2>Vocabularies</h2>
-        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/vocabularies</code>
-          <p>List all registered vocabularies.</p>
-        </div>
-        <div class="endpoint"><span
-            class="badge badge-get">GET</span><code>/api/v1/vocabularies/{id}/concepts/search</code>
-          <p>Search concepts. Query: <code>q=price&amp;limit=20</code>.</p>
-        </div>
-        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/vocabularies/translate</code>
-          <p>Translate one concept IRI to a human-readable label. Query: <code>iri=&lt;concept-iri&gt;</code>.</p>
-        </div>
-        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/vocabularies/translate</code>
-          <p>Batch-translate IRIs to labels. Body: a JSON array of IRIs. Returns an IRI→label map. The UI uses this
-            to render labels instead of raw IRIs.</p>
-        </div>
-        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/catalogs/{id}/export</code>
-          <p>Export as DCAT JSON-LD. Set <code>Accept: application/ld+json</code>.</p>
-        </div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/vocabularies</code><p>List all registered vocabularies (system-loaded and custom).</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/vocabularies</code><p>Register a custom vocabulary.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/vocabularies/{id}</code><p>Get a vocabulary by ID.</p></div>
+        <div class="endpoint"><span class="badge badge-put">PUT</span><code>/api/v1/vocabularies/{id}</code><p>Update a custom vocabulary.</p></div>
+        <div class="endpoint"><span class="badge badge-delete">DELETE</span><code>/api/v1/vocabularies/{id}</code><p>Delete a custom vocabulary.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/vocabularies/{id}/concepts/search</code><p>Search concepts. Params: <code>q</code>, <code>limit</code> (default 20).</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/vocabularies/translate</code><p>Translate one IRI to a human-readable label. Param: <code>iri=&lt;concept-iri&gt;</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/vocabularies/translate</code><p>Batch-translate up to 200 IRIs. Body: JSON array of IRIs. Returns <code>{"translations":{"&lt;iri&gt;":"&lt;label&gt;",...}}</code>.</p></div>
+
+        <h2>Vocabulary Profiles</h2>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets/{datasetId}/vocabulary-profiles</code><p>List vocabulary profiles assigned to a dataset.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/datasets/{datasetId}/vocabulary-profiles</code><p>Assign a vocabulary. Body: <code>{"vocabularyId":"...","isPrimary":true,"domainTags":[]}</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-delete">DELETE</span><code>/api/v1/datasets/{datasetId}/vocabulary-profiles/{vocabId}</code><p>Remove a vocabulary profile from a dataset.</p></div>
+
+        <h2>Dashboard</h2>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/dashboard/summary</code><p>Counts of datasets, data products, and pending governance tasks for the current user.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/dashboard/activity</code><p>Recent dataset activity (creates, updates, AI accepts) for the current user.</p></div>
+
+        <h2>Terms Policies (ODRL)</h2>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/terms-policies</code><p>List all policy sets for the tenant.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/terms-policies</code><p>Create a DRAFT policy set. Body: <code>{"name":"...","description":"..."}</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/terms-policies/{id}</code><p>Get a policy set with all rules and obligations.</p></div>
+        <div class="endpoint"><span class="badge badge-put">PUT</span><code>/api/v1/terms-policies/{id}</code><p>Update a policy set's name and description.</p></div>
+        <div class="endpoint"><span class="badge badge-delete">DELETE</span><code>/api/v1/terms-policies/{id}</code><p>Delete a DRAFT policy set.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/terms-policies/{id}/activate</code><p>Activate a policy set so it is used for terms derivation.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/terms-policies/{id}/clone</code><p>Clone a policy set to a new DRAFT. Body: <code>{"name":"..."}</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-put">PUT</span><code>/api/v1/terms-policies/{id}/classification-rules/{classification}</code><p>Upsert terms rule for a classification level (<code>PUBLIC</code> | <code>INTERNAL</code> | <code>CONFIDENTIAL</code> | <code>HIGH_CONFIDENTIAL</code>).</p></div>
+        <div class="endpoint"><span class="badge badge-delete">DELETE</span><code>/api/v1/terms-policies/{id}/classification-rules/{classification}</code><p>Delete terms rule for a classification level.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/terms-policies/{id}/regulation-rules</code><p>List regulation detection rules for a policy set.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/terms-policies/{id}/regulation-rules</code><p>Add a regulation detection rule (e.g. GDPR, MiFID II keyword signal).</p></div>
+        <div class="endpoint"><span class="badge badge-put">PUT</span><code>/api/v1/terms-policies/{id}/regulation-rules/{ruleId}</code><p>Update a regulation detection rule.</p></div>
+        <div class="endpoint"><span class="badge badge-delete">DELETE</span><code>/api/v1/terms-policies/{id}/regulation-rules/{ruleId}</code><p>Delete a regulation detection rule.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/terms-policies/{id}/regulation-obligations</code><p>List regulation obligations (e.g. audit obligation triggered by Basel III signal).</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/terms-policies/{id}/regulation-obligations</code><p>Add a regulation obligation.</p></div>
+        <div class="endpoint"><span class="badge badge-delete">DELETE</span><code>/api/v1/terms-policies/{id}/regulation-obligations/{oblId}</code><p>Delete a regulation obligation.</p></div>
 
         <div class="page-nav">
           <a class="page-nav-btn" onclick="show('api-auth')">
@@ -3889,32 +4110,20 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" \
         <h1>Harvest API <small style="font-size:14px;color:var(--subtle);font-weight:400">:8002</small></h1>
 
         <h2>Sources</h2>
-        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/sources</code>
-          <p>List all harvest sources. Filter by <code>type</code>.</p>
-        </div>
-        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/sources</code>
-          <p>Register a new source.</p>
-        </div>
-        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/sources/{id}/test</code>
-          <p>Test connectivity to the source.</p>
-        </div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/sources</code><p>List all harvest sources. Params: <code>type</code>, <code>page</code>, <code>size</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/sources</code><p>Register a new data source.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/sources/{id}</code><p>Get a source by ID.</p></div>
+        <div class="endpoint"><span class="badge badge-put">PUT</span><code>/api/v1/sources/{id}</code><p>Update a source's configuration.</p></div>
+        <div class="endpoint"><span class="badge badge-delete">DELETE</span><code>/api/v1/sources/{id}</code><p>Delete a source.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/sources/{id}/test</code><p>Test connectivity to the source. Returns <code>{"success":bool,"message":"..."}</code>.</p></div>
 
-        <h2>Jobs &amp; Runs</h2>
-        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/jobs</code>
-          <p>List harvest jobs.</p>
-        </div>
-        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/jobs</code>
-          <p>Create a scheduled or on-demand job.</p>
-        </div>
-        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/jobs/{id}/trigger</code>
-          <p>Trigger an immediate harvest run.</p>
-        </div>
-        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/jobs/{id}/cancel</code>
-          <p>Cancel a running job.</p>
-        </div>
-        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/runs/{id}/items</code>
-          <p>Inspect per-entity results of a run.</p>
-        </div>
+        <h2>Jobs</h2>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/jobs</code><p>List harvest jobs. Params: <code>sourceId</code>, <code>page</code>, <code>size</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/jobs</code><p>Create a scheduled or on-demand harvest job.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/jobs/{id}</code><p>Get a job and its latest run summary.</p></div>
+        <div class="endpoint"><span class="badge badge-put">PUT</span><code>/api/v1/jobs/{id}</code><p>Update a job's schedule or configuration.</p></div>
+        <div class="endpoint"><span class="badge badge-delete">DELETE</span><code>/api/v1/jobs/{id}</code><p>Delete a harvest job.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/jobs/{id}/trigger</code><p>Trigger an immediate harvest run. Returns the run ID.</p></div>
 
         <div class="page-nav">
           <a class="page-nav-btn" onclick="show('api-catalog')">
@@ -3933,25 +4142,18 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" \
         <div class="breadcrumb"><span>Docs</span> › <span>API Reference</span> › Lineage API</div>
         <h1>Lineage API <small style="font-size:14px;color:var(--subtle);font-weight:400">:8003</small></h1>
 
-        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/lineage</code>
-          <p>Ingest an OpenLineage RunEvent (START, RUNNING, COMPLETE, FAIL, ABORT).</p>
-        </div>
-        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets/{ns}/{name}/lineage</code>
-          <p>Graph traversal. Params: <code>direction=upstream|downstream</code>, <code>depth=1..10</code>.</p>
-        </div>
-        <div class="endpoint"><span
-            class="badge badge-get">GET</span><code>/api/v1/datasets/{ns}/{name}/column-lineage</code>
-          <p>Column-level lineage. Params: <code>column</code>, <code>direction</code>.</p>
-        </div>
-        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets/{ns}/{name}/impact</code>
-          <p>Downstream impact analysis — all datasets that depend on this one.</p>
-        </div>
-        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/ddl/submit</code>
-          <p>Submit DDL for Calcite parsing. Body: <code>{"dialect":"SNOWFLAKE","ddl":"CREATE VIEW ..."}</code>.</p>
-        </div>
-        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/jobs/{ns}/{name}/runs</code>
-          <p>Run history for a job. Filter by <code>state</code>, <code>start</code>, <code>end</code>.</p>
-        </div>
+        <h2>OpenLineage ingest</h2>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/lineage</code><p>Ingest an OpenLineage RunEvent. Accepted states: <code>START</code>, <code>RUNNING</code>, <code>COMPLETE</code>, <code>FAIL</code>, <code>ABORT</code>.</p></div>
+
+        <h2>Dataset lineage</h2>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets/lookup</code><p>Resolve a dataset by OpenLineage namespace+name to its inventory UUID. Params: <code>namespace</code>, <code>name</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets/{id}/lineage</code><p>Graph traversal by inventory UUID. Params: <code>direction=upstream|downstream</code>, <code>depth=1..10</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/datasets/{id}/impact</code><p>Downstream impact analysis — all datasets that depend on this one.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/catalog-datasets/{catalogId}/lineage-identity</code><p>List lineage-known datasets within a catalog with their OpenLineage namespace/name identity.</p></div>
+        <div class="endpoint"><span class="badge badge-put">PUT</span><code>/api/v1/datasets/{namespace}/{name}/catalog-link</code><p>Associate an OpenLineage dataset identity with an inventory catalog. Body: <code>{"catalogId":"..."}</code>.</p></div>
+
+        <h2>DDL parser</h2>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/ddl/submit</code><p>Parse DDL with Apache Calcite and emit column-level lineage events. Body: <code>{"dialect":"SNOWFLAKE","ddl":"CREATE VIEW ..."}</code>.</p></div>
 
         <div class="page-nav">
           <a class="page-nav-btn" onclick="show('api-harvest')">
@@ -3979,11 +4181,8 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" \
         <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/search/suggest</code>
           <p>Autocomplete. Param: <code>q</code>. Returns up to 10 suggestions.</p>
         </div>
-        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/search/saved</code>
-          <p>Save a search query for later reuse.</p>
-        </div>
         <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/admin/reindex</code>
-          <p>Trigger a full reindex from inventory-service. Admin only.</p>
+          <p>Trigger a full reindex from inventory-service. Admin only. Returns <code>{"datasetsIndexed":N,"dataProductsIndexed":N,"distributionsIndexed":N}</code>.</p>
         </div>
 
         <div class="page-nav">
@@ -4003,36 +4202,130 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" \
         <div class="breadcrumb"><span>Docs</span> › <span>API Reference</span> › AI API</div>
         <h1>AI API <small style="font-size:14px;color:var(--subtle);font-weight:400">:8005</small></h1>
 
-        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/conversations</code>
-          <p>List conversations for the current user.</p>
-        </div>
-        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/conversations</code>
-          <p>Create a new conversation. Body: <code>{"title":"..."}</code>.</p>
-        </div>
+        <h2>Conversations</h2>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/conversations</code><p>List conversations for the current user. Each item: <code>{"id","title","tenantId","createdAt"}</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/conversations</code><p>Create a new conversation. Body: <code>{"title":"..."}</code>. Returns <code>{"id","title","tenantId","createdAt"}</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/conversations/{id}</code><p>Get a conversation by ID. Returns <code>{"id","title","tenantId","createdAt"}</code>.</p></div>
         <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/conversations/{id}/messages</code>
-          <p>Send a message. Set <code>Accept: text/event-stream</code> for SSE streaming. Response tokens arrive as
-            <code>data: &lt;token&gt;</code> events.
-          </p>
+          <p>Send a message. Set <code>Accept: text/event-stream</code> for SSE streaming. Response tokens arrive as <code>data: &lt;token&gt;</code> events.</p>
+          <p>Request body fields:</p>
+          <ul style="margin:4px 0 0 16px;font-size:13px">
+            <li><code>content</code> <em>(required)</em> — the user's message text</li>
+            <li><code>focusDatasetId</code> <em>(optional)</em> — single dataset UUID; pre-loads schema as context</li>
+            <li><code>focusDatasetIds</code> <em>(optional)</em> — array of dataset UUIDs for multi-table queries; the AI loads physical schema for all listed datasets, derives join hints from shared vocabulary concept IRIs, and enforces platform isolation (Snowflake, Delta Lake, etc.) — no mixed-platform SQL is generated</li>
+          </ul>
         </div>
-        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/semantic-search</code>
-          <p>Vector similarity search. Body: <code>{"query":"...","limit":10,"entityTypes":["dataset"]}</code>.</p>
-        </div>
-        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/admin/embeddings/refresh</code>
-          <p>Re-embed all documents. Admin only.</p>
-        </div>
-        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/classify/elements</code>
-          <p>Classify data elements by sensitivity (<code>PUBLIC</code>…<code>HIGH_CONFIDENTIAL</code>). Body:
-            <code>{"elements":[{"elementId":"...","name":"...","logicalType":"...","vocabConceptLabels":[...]}]}</code>.
-          </p>
-        </div>
-        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/recommend-semantic-context</code>
-          <p>Recommend semantic types for a dataset from its metadata. Body includes <code>title</code>,
-            <code>keywords</code>, <code>elementNames</code>, <code>currentVocabLabels</code>.</p>
-        </div>
+
+        <h2>AI recommendations (element-level)</h2>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/classify/elements</code><p>Classify data elements by sensitivity (<code>PUBLIC</code>…<code>HIGH_CONFIDENTIAL</code>). Body: <code>{"elements":[{"elementId":"...","name":"...","logicalType":"...","vocabConceptLabels":[]}]}</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/describe/elements</code><p>Generate natural-language descriptions for data elements. Body: <code>{"elements":[{"elementId":"...","name":"...","logicalType":"..."}]}</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/recommend-vocab-concepts</code><p>Suggest SKOS vocabulary concepts for elements. Body: <code>{"elements":[...],"vocabularyIds":["..."]}</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/recommend-pii</code><p>Detect PII indicators (<code>isPersonalInformation</code>, <code>isDirectIdentifier</code>) for elements. Body: <code>{"elements":[...]}</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/recommend-semantic-context</code><p>Recommend semantic types for a dataset. Body includes <code>title</code>, <code>keywords</code>, <code>elementNames</code>, <code>currentVocabLabels</code>.</p></div>
 
         <div class="page-nav">
           <a class="page-nav-btn" onclick="show('api-search')">
             <span class="dir">← Previous</span><span class="label">Search API</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('api-policy')">
+            <span class="dir">Next →</span><span class="label">Policy API</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     API REFERENCE — POLICY API
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-api-policy" data-title="Policy API" data-section="API Reference">
+        <div class="breadcrumb"><span>Docs</span> › <span>API Reference</span> › Policy API</div>
+        <h1>Policy API <small style="font-size:14px;color:var(--subtle);font-weight:400">:8007</small></h1>
+
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/policies/{datasetId}</code>
+          <p>Retrieve the stored ODRL policy record for a dataset (scoped to the caller's tenant).</p>
+        </div>
+        <div class="endpoint"><span class="badge" style="background:rgba(251,191,36,0.15);color:#fbbf24;border:1px solid rgba(251,191,36,0.3)">PUT</span><code>/api/v1/policies/{datasetId}</code>
+          <p>Upsert a policy. Body: <code>{"policyJson": "...", "policyLevel": "A"}</code>. <code>policyLevel</code> is <code>A</code> or <code>B1</code>.</p>
+        </div>
+        <div class="endpoint"><span class="badge" style="background:rgba(248,113,113,0.15);color:#f87171;border:1px solid rgba(248,113,113,0.3)">DELETE</span><code>/api/v1/policies/{datasetId}</code>
+          <p>Remove the policy record for a dataset.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/policies/{datasetId}/evaluate</code>
+          <p>Evaluate the policy using ODRE Algorithm 1. Body: <code>{"M": {}, "F": {}}</code>.
+            <code>M</code> is a string→any variable map injected into B1-Level <code>[=varName]</code> placeholders.
+            Returns <code>{"granted": bool, "policyLevel": "A"|"B1", "decisions": [{"action":"read","result":"true","delegated":false}]}</code>.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/policies/{datasetId}/components</code>
+          <p>Retrieve the decomposed ODRL policy tree: permissions, prohibitions, and obligations as separate lists.</p>
+        </div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/policies/{datasetId}/evaluations</code>
+          <p>Paginated evaluation log. Params: <code>page</code>, <code>size</code>.</p>
+        </div>
+
+        <h2>B1-Level example</h2>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre><code class="language-bash"># Store a B1-Level policy (role check via variable injection)
+curl -X PUT http://localhost:8007/api/v1/policies/{datasetId} \
+  -H "X-API-Key: dev-local" -H "Content-Type: application/json" \
+  -d '{
+    "policyLevel": "B1",
+    "policyJson": "{\"@context\":\"http://www.w3.org/ns/odrl.jsonld\",\"@type\":\"Set\",\"uid\":\"urn:b1\",\"permission\":[{\"target\":\"dataset:x\",\"action\":\"read\",\"constraint\":[{\"leftOperand\":{\"@value\":\"[=callerRole]\",\"@type\":\"xsd:string\"},\"operator\":\"eq\",\"rightOperand\":{\"@value\":\"DATA_OWNER\",\"@type\":\"xsd:string\"}}]}]}"
+  }'
+
+# Evaluate — DATA_STEWARD → denied
+curl -X POST http://localhost:8007/api/v1/policies/{datasetId}/evaluate \
+  -H "X-API-Key: dev-local" -H "Content-Type: application/json" \
+  -d '{"M":{"callerRole":"DATA_STEWARD"},"F":{}}'
+# → {"granted":false,"decisions":[]}
+
+# Evaluate — DATA_OWNER → granted
+curl -X POST http://localhost:8007/api/v1/policies/{datasetId}/evaluate \
+  -H "X-API-Key: dev-local" -H "Content-Type: application/json" \
+  -d '{"M":{"callerRole":"DATA_OWNER"},"F":{}}'
+# → {"granted":true,"decisions":[{"action":"read","result":"true","delegated":false}]}</code></pre>
+        </div>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('api-ai')">
+            <span class="dir">← Previous</span><span class="label">AI API</span>
+          </a>
+          <a class="page-nav-btn right" onclick="show('api-identity')">
+            <span class="dir">Next →</span><span class="label">Identity API</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- ════════════════════════════════════════════════════════════
+     IDENTITY API
+     ════════════════════════════════════════════════════════════ -->
+      <article class="page" id="page-api-identity" data-title="Identity API" data-section="API Reference">
+        <div class="breadcrumb"><span>Docs</span> › <span>API Reference</span> › Identity API</div>
+        <h1>Identity API <small style="font-size:14px;color:var(--subtle);font-weight:400">:8006</small></h1>
+
+        <h2>Users</h2>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/users</code><p>List all users in the tenant. Params: <code>page</code>, <code>size</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/users/{id}</code><p>Get a user by internal UUID.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/users/by-keycloak/{keycloakId}</code><p>Resolve a Keycloak subject ID to the internal user record.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/users/invite</code><p>Invite a new user by email. Creates a Keycloak account and a pending identity record. Body: <code>{"email":"...","role":"DATA_STEWARD"}</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-put">PUT</span><code>/api/v1/users/{id}</code><p>Update a user's display name or role.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/users/{id}/activate</code><p>Activate a pending user account.</p></div>
+        <div class="endpoint"><span class="badge badge-delete">DELETE</span><code>/api/v1/users/{id}</code><p>Deactivate and remove a user from the tenant.</p></div>
+
+        <h2>Bookmarks</h2>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/bookmarks</code><p>List all bookmarks for the current user.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/bookmarks</code><p>Create a bookmark. Body: <code>{"datasetId":"...","collectionId":"...","note":"..."}</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-delete">DELETE</span><code>/api/v1/bookmarks/{id}</code><p>Delete a bookmark.</p></div>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/bookmarks/dataset/{datasetId}</code><p>Check whether the current user has bookmarked a specific dataset. Returns the bookmark record or <code>204</code>.</p></div>
+
+        <h2>Bookmark Collections</h2>
+        <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/bookmark-collections</code><p>List bookmark collections for the current user.</p></div>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/bookmark-collections</code><p>Create a collection. Body: <code>{"name":"...","description":"..."}</code>.</p></div>
+        <div class="endpoint"><span class="badge badge-put">PUT</span><code>/api/v1/bookmark-collections/{id}</code><p>Rename or update a collection's description.</p></div>
+        <div class="endpoint"><span class="badge badge-delete">DELETE</span><code>/api/v1/bookmark-collections/{id}</code><p>Delete a collection (bookmarks are unlinked, not deleted).</p></div>
+
+        <div class="page-nav">
+          <a class="page-nav-btn" onclick="show('api-policy')">
+            <span class="dir">← Previous</span><span class="label">Policy API</span>
           </a>
           <a class="page-nav-btn right" onclick="show('deploy-compose')">
             <span class="dir">Next →</span><span class="label">Docker Compose</span>
@@ -4102,7 +4395,7 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" \
           </tr>
           <tr>
             <td>(default)</td>
-            <td>All 6 services + Kafka + PostgreSQL × 4 + OpenSearch + MinIO + Keycloak</td>
+            <td>All 7 services + Kafka + PostgreSQL × 6 + OpenSearch + MinIO + Keycloak</td>
           </tr>
           <tr>
             <td><code>ai</code></td>
@@ -4118,8 +4411,8 @@ docker compose --profile ai up -d</code></pre>
         </div>
 
         <div class="page-nav">
-          <a class="page-nav-btn" onclick="show('api-ai')">
-            <span class="dir">← Previous</span><span class="label">AI API</span>
+          <a class="page-nav-btn" onclick="show('api-identity')">
+            <span class="dir">← Previous</span><span class="label">Identity API</span>
           </a>
           <a class="page-nav-btn right" onclick="show('deploy-env')">
             <span class="dir">Next →</span><span class="label">Environment Variables</span>
@@ -4553,9 +4846,9 @@ docker compose up -d inventory-service</code></pre>
       'arch-overview', 'arch-services', 'arch-events', 'arch-security',
       'model-overview', 'model-dcat', 'model-dprod', 'model-csvw', 'model-logical', 'model-vocab', 'model-vocab-ai', 'model-lineage',
       'erd',
-      'svc-catalog', 'svc-harvest', 'svc-lineage', 'svc-search', 'svc-ai', 'svc-identity',
+      'svc-catalog', 'svc-harvest', 'svc-lineage', 'svc-search', 'svc-ai', 'svc-identity', 'svc-policy',
       'user-mgmt', 'user-invite', 'user-keycloak',
-      'api-auth', 'api-catalog', 'api-harvest', 'api-lineage', 'api-search', 'api-ai',
+      'api-auth', 'api-catalog', 'api-harvest', 'api-lineage', 'api-search', 'api-ai', 'api-policy', 'api-identity',
       'deploy-compose', 'deploy-env', 'deploy-k8s-raw', 'deploy-k8s',
       'contrib-dev', 'contrib-guide'
     ];

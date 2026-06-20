@@ -244,12 +244,38 @@ curl -s http://api.catalog.local/search/actuator/health
 | `http://api.catalog.local/inventory/swagger-ui.html` | Inventory service Swagger UI |
 | `http://api.catalog.local/search/swagger-ui.html` | Search service Swagger UI |
 
-Keycloak admin console (accessed directly via port-forward):
+Keycloak admin console — via the ingress host (add `keycloak.catalog.local` to
+`/etc/hosts` as printed by `deploy.sh`):
+
+```
+http://keycloak.catalog.local/admin   —  user: admin / pass: admin
+```
+
+Or directly via port-forward:
 
 ```bash
 kubectl -n odin-catalog port-forward svc/odin-catalog-keycloak 8180:8180
 # Open http://localhost:8180  —  user: admin / pass: admin
 ```
+
+### Adding a user manually
+
+New users need two custom attributes set so the backend can authorize them:
+`tenant_id` and `permissions` (e.g. `catalog:read`, `catalog:write`,
+`catalog:admin`). Set them via the **Keycloak Admin Console**:
+
+1. Open `http://keycloak.catalog.local/admin` → select the **datacatalog** realm.
+2. **Users → Add user** (or select an existing one). Set username, email, and on
+   the **Credentials** tab set a password.
+3. Go to the **Attributes** tab and add:
+   - `tenant_id` → the tenant UUID (e.g. `00000000-0000-0000-0000-000000000001`)
+   - `permissions` → one row per grant: `catalog:read`, `catalog:write`,
+     `catalog:admin`
+
+The realm sets `unmanagedAttributePolicy: ADMIN_EDIT`, so these attributes always
+save correctly and are admin-editable. This policy is part of the realm import, so
+it applies automatically to any fresh deployment. Attributes can equivalently be
+set through the Keycloak Admin REST API.
 
 ---
 
