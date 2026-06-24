@@ -272,10 +272,10 @@ New users need two custom attributes set so the backend can authorize them:
    - `permissions` → one row per grant: `catalog:read`, `catalog:write`,
      `catalog:admin`
 
-The realm sets `unmanagedAttributePolicy: ADMIN_EDIT`, so these attributes always
-save correctly and are admin-editable. This policy is part of the realm import, so
-it applies automatically to any fresh deployment. Attributes can equivalently be
-set through the Keycloak Admin REST API.
+The realm sets `unmanagedAttributePolicy: ENABLED`, so these unmanaged attributes
+always save correctly. This policy is part of the realm import, so it applies
+automatically to any fresh deployment. Attributes can equivalently be set through
+the Keycloak Admin REST API.
 
 ---
 

@@ -267,7 +267,7 @@ Traefik (port 80/443)
 | **harvest-service** | 8002 | PostgreSQL 16 + MinIO | Spring Batch crawlers for Snowflake, AWS Glue, Teradata, DCAT HTTP; Quartz scheduler |
 | **lineage-service** | 8003 | PostgreSQL + Apache AGE | OpenLineage REST ingestion, DDL parsing via Calcite, Cypher graph queries |
 | **search-service** | 8004 | OpenSearch 2.x | Full-text + semantic indexing, FIBO facets, autocomplete suggestions |
-| **ai-service** | 8005 | PostgreSQL + pgvector | Spring AI RAG pipeline, embeddings, SSE chat streaming, Ollama / OpenAI |
+| **ai-service** | 8005 | PostgreSQL + pgvector | Spring AI RAG pipeline, embeddings, SSE chat streaming, agentic proposer/reviewer review, Ollama / OpenAI |
 | **identity-service** | 8006 | PostgreSQL 16 | Keycloak OAuth2/OIDC, role-based access (Administrator, Data Owner, Steward, Governance), user provisioning with Keycloak sync, API keys, tenant management |
 | **policy-service** | 8007 | PostgreSQL 16 | ODRL policy registry and ODRE enforcement engine (PDP). Evaluates A-Level and B1-Level ODRL policies at request time; syncs policies from dataset change events via Kafka; persists evaluation log. |
 
@@ -699,7 +699,16 @@ The `granted` field is `true` when the decision set contains a `(read, "true")` 
 
 **Kafka sync:** policy-service subscribes to `inventory.datasets.changes`. When a dataset event carries a non-null `hasPolicy` field (set after a data owner accepts terms), the policy is automatically upserted into the policy registry — no manual `PUT` required.
 
-**Evaluation log:** Every `POST /evaluate` call is persisted to `evaluation_log` and a `PolicyEvaluationResultPayload` event is published to `policy.evaluations.completed` for downstream enforcement points.
+**Evaluation log:** Every `POST /evaluate` call is persisted to `evaluation_log` and a `PolicyEvaluationResultPayload` event is published to `policy.evaluations.completed` for downstream enforcement points. Retrieve recent decisions with `GET /api/v1/policies/{datasetId}/evaluations`.
+
+**Policy composition (component pieces):** A dataset's effective policy is not a single hand-written document — it is assembled from reusable, typed fragments called **policy pieces**. Each piece has a `pieceType` of `CLASSIFICATION` (derived from the data's sensitivity), `REGULATION` (e.g. FCRA-aware rules), or `CONTRACTUAL` (terms-of-use obligations), keyed by a dimension value. `dataset_policy_links` records which pieces apply to which dataset, and the registry composes them into the effective `policy_records` document. Inspect the breakdown with:
+
+```bash
+curl http://localhost:8007/api/v1/policies/{datasetId}/components \
+  -H "X-API-Key: dev-local"
+# → { "components": { "CLASSIFICATION": {...}, "REGULATION": {...}, "CONTRACTUAL": {...} },
+#     "assembled": { ...effective ODRL policy... } }
+```
 
 ---
 
@@ -908,6 +917,23 @@ curl -N -X POST http://localhost:8005/api/v1/conversations/$CONV/messages \
 | 2 | Semantic types + vocab concept labels + logical element names (type layer — enables "which datasets contain Customer data?" queries) |
 
 All three chunks are embedded and upserted into pgvector. During RAG retrieval the top-8 chunks from the semantic similarity search are injected as catalog context into the system prompt.
+
+#### Agentic Review (proposer/reviewer)
+
+Beyond one-shot recommendations, the ai-service runs a **two-agent proposer/reviewer loop** over a logical model to produce higher-quality, self-critiqued metadata enrichment. A **proposer** agent drafts per-element descriptions, classifications, vocabulary concept mappings, and PII / direct-identifier flags; a **reviewer** agent then audits that draft against the dataset's full DCAT context and returns a verdict (`APPROVE` / `REJECT`) with per-issue comments. The proposer revises on each `REJECT`. The loop is **capped at 10 iterations**, and a **long-term review memory** carries lessons from past reviews into new runs to speed convergence. When the loop converges (or hits the cap), the final recommendation is persisted to the model's elements for a data owner to accept or reject in the producer Governance tab.
+
+Progress streams live over **Server-Sent Events** — each `data:` line is a JSON `AgenticEvent`: phase markers (`CONTEXT`, `MEMORY`, `PROPOSING`, `REVIEWING`, `LOCKED`), the proposer's `PROPOSAL`, the reviewer's `REVIEW` (verdict + comments + summary), and a terminal `DONE` / `MAX_REACHED` / `ERROR`.
+
+```bash
+# Run the agentic review over one logical model and stream progress (SSE)
+curl -N -X POST http://localhost:8005/api/v1/agentic-review \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: dev-local" \
+  -H "Accept: text/event-stream" \
+  -d '{"datasetId": "3fa85f64-5717-4562-b3fc-2c963f66afa6", "modelId": "3fa85f64-5717-4562-b3fc-2c963f66afa6"}'
+```
+
+> Swagger UI cannot render SSE — use `curl -N` or the producer UI to observe the stream.
 
 ---
 
@@ -1256,6 +1282,7 @@ The `semanticType` parameter filters by IRI terminal fragment (e.g. `?semanticTy
 | `GET` | `/api/v1/conversations` | List conversations for the current user |
 | `POST` | `/api/v1/conversations` | Create a new conversation |
 | `POST` | `/api/v1/conversations/{id}/messages` | Send a message. Set `Accept: text/event-stream` for SSE. Optional `focusDatasetId` body field pins context to a specific dataset |
+| `POST` | `/api/v1/agentic-review` | Run the proposer/reviewer agent loop over a logical model and stream `AgenticEvent` progress (SSE). Body: `{"datasetId": "...", "modelId": "..."}`. The converged result is persisted to the model's elements for accept/reject |
 | `POST` | `/api/v1/semantic-search` | Vector similarity search |
 | `POST` | `/api/v1/admin/embeddings/refresh` | Re-embed all documents |
 
@@ -1273,6 +1300,7 @@ The `semanticType` parameter filters by IRI terminal fragment (e.g. `?semanticTy
 | `PUT` | `/api/v1/policies/{datasetId}` | Upsert a policy. Body: `{"policyJson": "...", "policyLevel": "A"}` |
 | `DELETE` | `/api/v1/policies/{datasetId}` | Remove the policy record for a dataset |
 | `POST` | `/api/v1/policies/{datasetId}/evaluate` | Evaluate the policy. Body: `{"M": {}, "F": {}}`. Returns `{"granted": bool, "policyLevel": "A", "decisions": [...]}` |
+| `GET` | `/api/v1/policies/{datasetId}/components` | Component breakdown of the assembled policy, keyed by piece type (`CLASSIFICATION`, `REGULATION`, `CONTRACTUAL`) and dimension, plus the assembled document |
 | `GET` | `/api/v1/policies/{datasetId}/evaluations` | Paginated evaluation log. Params: `page`, `size` |
 
 **`M` map (B1-Level variable injection):** Pass any runtime context that the stored policy references via `[=varName]` placeholders. Common keys: `callerRole`, `callerId`, `purpose`. Keys not referenced in the policy are silently ignored.

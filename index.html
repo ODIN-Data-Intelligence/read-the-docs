@@ -2608,7 +2608,7 @@ curl "http://localhost:8003/api/v1/datasets/TRADING_DB.BLOTTER/TRADE_BLOTTER/imp
       <article class="page" id="page-erd" data-title="Database ERDs" data-section="Database ERDs">
         <div class="breadcrumb"><span>Docs</span> › <span>Database ERDs</span> › All Databases</div>
         <h1>Database ERDs</h1>
-        <p>Five databases, one per service. All primary keys are <code>UUID</code>. Foreign keys are
+        <p>Six databases, one per service. All primary keys are <code>UUID</code>. Foreign keys are
           intra-database only; cross-service references are soft <code>UUID</code> columns without a
           database-level FK constraint.</p>
         <p>Use the zoom controls or scroll wheel to navigate large diagrams. Click and drag to pan.</p>
@@ -2620,6 +2620,7 @@ curl "http://localhost:8003/api/v1/datasets/TRADING_DB.BLOTTER/TRADE_BLOTTER/imp
           <button class="erd-tab" onclick="switchErd('lin')">lineage-service</button>
           <button class="erd-tab" onclick="switchErd('ai')">ai-service</button>
           <button class="erd-tab" onclick="switchErd('id')">identity-service</button>
+          <button class="erd-tab" onclick="switchErd('pol')">policy-service</button>
         </div>
 
         <!-- ── inventory-service ─────────────────────────────────── -->
@@ -3197,6 +3198,78 @@ curl "http://localhost:8003/api/v1/datasets/TRADING_DB.BLOTTER/TRADE_BLOTTER/imp
           </p>
         </div>
 
+        <!-- ── policy-service ────────────────────────────────────── -->
+        <div class="erd-panel" id="erd-panel-pol">
+          <div class="erd-wrapper" id="erd-wrapper-pol">
+            <div class="erd-toolbar">
+              <span class="erd-db-label">policy-service · PostgreSQL 16</span>
+              <div class="erd-zoom-controls">
+                <button class="erd-zoom-btn" title="Zoom in" onclick="erdZoom('pol','in')">+</button>
+                <button class="erd-zoom-btn" title="Reset" onclick="erdZoom('pol','reset')">⊙</button>
+                <button class="erd-zoom-btn" title="Zoom out" onclick="erdZoom('pol','out')">−</button>
+                <button class="erd-zoom-btn erd-fs-btn" title="Full screen" onclick="erdFullscreen('pol')"><svg
+                    width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round">
+                    <polyline points="15 3 21 3 21 9" />
+                    <polyline points="9 21 3 21 3 15" />
+                    <line x1="21" y1="3" x2="14" y2="10" />
+                    <line x1="3" y1="21" x2="10" y2="14" />
+                  </svg></button>
+              </div>
+            </div>
+            <div class="erd-container" id="erd-container-pol">
+              <div class="mermaid" id="erd-src-pol">
+                erDiagram
+                policy_records {
+                uuid id PK
+                uuid dataset_id
+                uuid tenant_id
+                varchar policy_level
+                jsonb policy_json
+                timestamptz created_at
+                timestamptz updated_at
+                }
+                evaluation_log {
+                uuid id PK
+                uuid dataset_id
+                uuid tenant_id
+                varchar action
+                boolean granted
+                jsonb request_context
+                timestamptz created_at
+                }
+                policy_pieces {
+                uuid id PK
+                uuid tenant_id
+                varchar piece_type
+                varchar dimension_key
+                text label
+                jsonb policy_json
+                varchar policy_level
+                timestamptz created_at
+                timestamptz updated_at
+                }
+                dataset_policy_links {
+                uuid id PK
+                uuid dataset_id
+                uuid tenant_id
+                uuid piece_id FK
+                timestamptz applied_at
+                }
+
+                policy_pieces ||--o{ dataset_policy_links : "applied to datasets"
+              </div>
+            </div>
+          </div>
+          <p class="erd-note">
+            <code>policy_records</code> holds the assembled, effective ODRL policy per dataset (unique on
+            <code>(dataset_id, tenant_id)</code>). <code>policy_pieces</code> are reusable, typed fragments
+            (<code>CLASSIFICATION</code> / <code>REGULATION</code> / <code>CONTRACTUAL</code>) that
+            <code>dataset_policy_links</code> composes onto datasets (<code>piece_id</code> FK cascades on
+            delete). Every <code>POST /evaluate</code> call appends a row to <code>evaluation_log</code>.
+          </p>
+        </div>
+
         <div class="page-nav">
           <a class="page-nav-btn" onclick="show('model-governance')">
             <span class="dir">← Previous</span><span class="label">Governance &amp; Audit</span>
@@ -3509,6 +3582,35 @@ curl -N -X POST http://localhost:8005/api/v1/conversations/$CONV/messages \
 #       "rationale": "...", "vocabularyHint": "FIBO" } ], "rationale": "..." }</code></pre>
         </div>
 
+        <h2>Agentic review (proposer / reviewer)</h2>
+        <p>Beyond one-shot recommendations, the ai-service runs a <strong>two-agent proposer/reviewer loop</strong>
+          over a logical model to produce higher-quality, self-critiqued enrichment. A <strong>proposer</strong> drafts
+          per-element descriptions, classifications, vocabulary concept mappings, and PII / direct-identifier flags; a
+          <strong>reviewer</strong> then audits that draft against the dataset's full DCAT context and returns a verdict
+          (<code>APPROVE</code> / <code>REJECT</code>) with per-issue comments. The proposer revises on each
+          <code>REJECT</code>. The loop is <strong>capped at 10 iterations</strong>, and a <strong>long-term review
+          memory</strong> carries lessons from past reviews into new runs to speed convergence. On convergence (or the
+          cap) the final recommendation is persisted to the model's elements for a data owner to accept or reject.</p>
+        <p>Progress streams over <strong>Server-Sent Events</strong> — each <code>data:</code> line is a JSON
+          <code>AgenticEvent</code>: phase markers (<code>CONTEXT</code>, <code>MEMORY</code>, <code>PROPOSING</code>,
+          <code>REVIEWING</code>, <code>LOCKED</code>), the proposer's <code>PROPOSAL</code>, the reviewer's
+          <code>REVIEW</code> (verdict + comments + summary), and a terminal <code>DONE</code> / <code>MAX_REACHED</code>
+          / <code>ERROR</code>.</p>
+        <div class="code-block">
+          <div class="code-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="language-bash"># Run the agentic review over one logical model and stream progress (SSE)
+curl -N -X POST http://localhost:8005/api/v1/agentic-review \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: dev-local" \
+  -H "Accept: text/event-stream" \
+  -d '{"datasetId": "&lt;dataset-id&gt;", "modelId": "&lt;logical-model-id&gt;"}'</code></pre>
+        </div>
+        <div class="callout info">
+          <span class="callout-icon">ℹ</span>
+          <div>Swagger UI cannot render SSE — use <code>curl -N</code> or the producer UI to observe the stream.</div>
+        </div>
+
         <div class="callout tip">
           <span class="callout-icon">✓</span>
           <div>The ai-service is optional. Start it with
@@ -3611,6 +3713,14 @@ curl -N -X POST http://localhost:8005/api/v1/conversations/$CONV/messages \
             <td>Variable injection: <code>[=varName]</code> placeholders in the stored policy are resolved from the <code>M</code> map passed at evaluation time. Use to inject caller role, caller ID, or any runtime value.</td>
           </tr>
         </table>
+
+        <h2>Policy composition (component pieces)</h2>
+        <p>A dataset's effective policy is assembled from reusable, typed fragments called <strong>policy pieces</strong>.
+          Each piece has a type of <code>CLASSIFICATION</code> (data sensitivity), <code>REGULATION</code> (e.g.
+          FCRA-aware rules), or <code>CONTRACTUAL</code> (terms-of-use obligations), keyed by a dimension value.
+          <code>dataset_policy_links</code> records which pieces apply to which dataset, and the registry composes them
+          into the effective <code>policy_records</code> document. Inspect the breakdown via
+          <code>GET /api/v1/policies/{datasetId}/components</code>.</p>
 
         <h2>UsageDecision semantics</h2>
         <table>
@@ -4223,6 +4333,15 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" \
         <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/recommend-pii</code><p>Detect PII indicators (<code>isPersonalInformation</code>, <code>isDirectIdentifier</code>) for elements. Body: <code>{"elements":[...]}</code>.</p></div>
         <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/recommend-semantic-context</code><p>Recommend semantic types for a dataset. Body includes <code>title</code>, <code>keywords</code>, <code>elementNames</code>, <code>currentVocabLabels</code>.</p></div>
 
+        <h2>Agentic review</h2>
+        <div class="endpoint"><span class="badge badge-post">POST</span><code>/api/v1/agentic-review</code>
+          <p>Run the proposer/reviewer agent loop over a logical model and stream progress as Server-Sent Events
+            (<code>Accept: text/event-stream</code>). Body: <code>{"datasetId":"...","modelId":"..."}</code>. Each
+            <code>data:</code> line is a JSON <code>AgenticEvent</code> (phases <code>CONTEXT</code>/<code>MEMORY</code>/<code>PROPOSING</code>/<code>REVIEWING</code>/<code>PROPOSAL</code>/<code>REVIEW</code>/<code>LOCKED</code>/<code>DONE</code>/<code>MAX_REACHED</code>/<code>ERROR</code>);
+            the reviewer verdict is <code>APPROVE</code> or <code>REJECT</code>. Loop capped at 10 iterations; the
+            converged result is persisted to the model's elements for the data owner to accept or reject.</p>
+        </div>
+
         <div class="page-nav">
           <a class="page-nav-btn" onclick="show('api-search')">
             <span class="dir">← Previous</span><span class="label">Search API</span>
@@ -4255,7 +4374,10 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" \
             Returns <code>{"granted": bool, "policyLevel": "A"|"B1", "decisions": [{"action":"read","result":"true","delegated":false}]}</code>.</p>
         </div>
         <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/policies/{datasetId}/components</code>
-          <p>Retrieve the decomposed ODRL policy tree: permissions, prohibitions, and obligations as separate lists.</p>
+          <p>Component breakdown of the assembled policy, keyed by piece type (<code>CLASSIFICATION</code>,
+            <code>REGULATION</code>, <code>CONTRACTUAL</code>) and dimension value, alongside the assembled ODRL
+            document. The effective policy is composed from reusable <code>policy_pieces</code> linked to the dataset
+            via <code>dataset_policy_links</code>.</p>
         </div>
         <div class="endpoint"><span class="badge badge-get">GET</span><code>/api/v1/policies/{datasetId}/evaluations</code>
           <p>Paginated evaluation log. Params: <code>page</code>, <code>size</code>.</p>
@@ -5050,7 +5172,7 @@ docker compose up -d inventory-service</code></pre>
       requestAnimationFrame(() => initPanZoom(key));
     };
 
-    const erdKeys = ['inv', 'hvt', 'lin', 'ai', 'id'];
+    const erdKeys = ['inv', 'hvt', 'lin', 'ai', 'id', 'pol'];
     let erdsRendered = false;
 
     window.initErds = async function () {

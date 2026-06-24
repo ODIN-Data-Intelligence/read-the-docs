@@ -1,6 +1,6 @@
 # ODIN Catalog — Database ERD
 
-Five databases, one per service. All primary keys are `UUID`. Foreign keys reference PKs in the same database only; cross-service references use soft IDs stored as `UUID` columns without a database-level FK constraint.
+Six databases, one per service. All primary keys are `UUID`. Foreign keys reference PKs in the same database only; cross-service references use soft IDs stored as `UUID` columns without a database-level FK constraint.
 
 ---
 
@@ -508,3 +508,56 @@ erDiagram
     domains        o|--o{  domains       : "parent"
     catalog_users  ||--o{  api_keys      : "owns"
 ```
+
+---
+
+## 6. policy-service · PostgreSQL 16
+
+Owns the ODRL policy registry and the ODRE evaluation audit trail. `policy_records` holds the assembled, effective ODRL policy per dataset, while `policy_pieces` are reusable, typed policy fragments (CLASSIFICATION / REGULATION / CONTRACTUAL) that `dataset_policy_links` composes onto datasets. `dataset_id` is a soft cross-service UUID (no FK to inventory-service).
+
+```mermaid
+erDiagram
+    policy_records {
+        uuid        id              PK
+        uuid        dataset_id          "UK with tenant_id"
+        uuid        tenant_id           "UK with dataset_id"
+        varchar     policy_level
+        jsonb       policy_json
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    evaluation_log {
+        uuid        id              PK
+        uuid        dataset_id
+        uuid        tenant_id
+        varchar     action
+        boolean     granted
+        jsonb       request_context
+        timestamptz created_at
+    }
+
+    policy_pieces {
+        uuid        id              PK
+        uuid        tenant_id           "UK with piece_type, dimension_key"
+        varchar     piece_type          "CLASSIFICATION | REGULATION | CONTRACTUAL"
+        varchar     dimension_key
+        text        label
+        jsonb       policy_json
+        varchar     policy_level
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    dataset_policy_links {
+        uuid        id              PK
+        uuid        dataset_id          "UK with tenant_id, piece_id"
+        uuid        tenant_id
+        uuid        piece_id        FK  "→ policy_pieces, ON DELETE CASCADE"
+        timestamptz applied_at
+    }
+
+    policy_pieces ||--o{ dataset_policy_links : "applied to datasets"
+```
+
+> Each evaluation call (`POST /api/v1/policies/{datasetId}/evaluate`) appends one row to `evaluation_log`. The effective `policy_records.policy_json` for a dataset is the composition of every `policy_pieces` row linked via `dataset_policy_links`.
